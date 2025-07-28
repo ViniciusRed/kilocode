@@ -236,6 +236,7 @@ export type ExtensionState = Pick<
 	| "maxConcurrentFileReads" // Optional in GlobalSettings, required here.
 	| "allowVeryLargeReads" // kilocode_change
 	| "terminalOutputLineLimit"
+	| "terminalOutputCharacterLimit"
 	| "terminalShellIntegrationTimeout"
 	| "terminalShellIntegrationDisabled"
 	| "terminalCommandDelay"
@@ -245,6 +246,7 @@ export type ExtensionState = Pick<
 	| "terminalZshP10k"
 	| "terminalZdotdir"
 	| "terminalCompressProgressBar"
+	| "diagnosticsEnabled"
 	| "diffEnabled"
 	| "fuzzyMatchThreshold"
 	// | "experiments" // Optional in GlobalSettings, required here.
@@ -424,6 +426,7 @@ export interface ClineApiReqInfo {
 	cacheWrites?: number
 	cacheReads?: number
 	cost?: number
+	usageMissing?: boolean // kilocode_change
 	cancelReason?: ClineApiReqCancelReason
 	streamingFailedMessage?: string
 	apiProtocol?: "anthropic" | "openai"

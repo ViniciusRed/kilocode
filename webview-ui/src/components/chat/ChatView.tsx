@@ -3,7 +3,6 @@ import { useDeepCompareEffect, useEvent, useMount } from "react-use"
 import debounce from "debounce"
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
 import removeMd from "remove-markdown"
-import { Trans } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import useSound from "use-sound"
 import { LRUCache } from "lru-cache"
@@ -31,11 +30,13 @@ import {
 	findLongestPrefixMatch,
 	parseCommand,
 } from "@src/utils/command-validation"
-import { useTranslation } from "react-i18next"
-import { buildDocLink } from "@src/utils/docLinks"
+import { Trans, useTranslation } from "react-i18next"
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { useSelectedModel } from "@src/components/ui/hooks/useSelectedModel"
+// import RooHero from "@src/components/welcome/RooHero" // kilocode_change: unused
+// import RooTips from "@src/components/welcome/RooTips" // kilocode_change: unused
+// import RooCloudCTA from "@src/components/welcome/RooCloudCTA" // kilocode_change: unused
 import { StandardTooltip } from "@src/components/ui"
 import { useAutoApprovalState } from "@src/hooks/useAutoApprovalState"
 import { useAutoApprovalToggles } from "@src/hooks/useAutoApprovalToggles"
@@ -57,6 +58,7 @@ import { showSystemNotification } from "@/kilocode/helpers" // kilocode_change
 import { CheckpointWarning } from "./CheckpointWarning"
 import { IdeaSuggestionsBox } from "../kilocode/chat/IdeaSuggestionsBox" // kilocode_change
 import { getLatestTodo } from "@roo/todo"
+import { buildDocLink } from "@/utils/docLinks"
 
 export interface ChatViewProps {
 	isHidden: boolean
@@ -118,6 +120,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		historyPreviewCollapsed, // Added historyPreviewCollapsed
 		soundEnabled,
 		soundVolume,
+		// cloudIsAuthenticated, // kilocode_change
 	} = useExtensionState()
 
 	const messagesRef = useRef(messages)
@@ -658,12 +661,12 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							text: trimmedInput,
 							images: images,
 						})
-						// Clear input state after sending
-						setInputValue("")
-						setSelectedImages([])
 					} else {
 						vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
 					}
+					// Clear input state after sending
+					setInputValue("")
+					setSelectedImages([])
 					break
 				case "completion_result":
 				case "resume_completed_task":
@@ -760,6 +763,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							if (!isHidden && !sendingDisabled && !enableButtons) {
 								textAreaRef.current?.focus()
 							}
+							break
+						case "focusInput":
+							textAreaRef.current?.focus()
 							break
 					}
 					break
@@ -973,8 +979,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 	// Check if a command message should be auto-approved.
 	const isAllowedCommand = useCallback(
 		(message: ClineMessage | undefined): boolean => {
-			if (message?.type !== "ask") return false
 			// kilocode_change start wrap in try/catch
+			if (message?.type !== "ask") return false
 			try {
 				return getCommandDecisionForMessage(message) === "auto_approve"
 			} catch (e) {
@@ -1803,7 +1809,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 						</p>
 						{taskHistory.length === 0 && <IdeaSuggestionsBox />} {/* kilocode_change */}
 						{/*<div className="mb-2.5">
-							<RooTips cycle={false} />
+							{cloudIsAuthenticated || taskHistory.length < 4 ? <RooTips /> : <RooCloudCTA />}
 						</div> kilocode_change: do not show */}
 						{/* Show the task history preview if expanded and tasks exist */}
 						{taskHistory.length > 0 && isExpanded && <HistoryPreview />}

@@ -23,6 +23,7 @@ import {
 	INITIAL_RETRY_DELAY_MS,
 	PARSING_CONCURRENCY,
 	BATCH_PROCESSING_CONCURRENCY,
+	MAX_PENDING_BATCHES,
 } from "../constants"
 import { isPathInIgnoredDirectory } from "../../glob/ignore-utils"
 import { TelemetryService } from "@roo-code/telemetry"
@@ -121,6 +122,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 		let currentBatchTexts: string[] = []
 		let currentBatchFileInfos: { filePath: string; fileHash: string; isNew: boolean }[] = []
 		const activeBatchPromises = new Set<Promise<void>>()
+		let pendingBatchCount = 0
 
 		// Process all files in parallel with concurrency control
 		const parsePromises = supportedPaths.map((filePath) =>
@@ -182,6 +184,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 
 									// Check if adaptive batch threshold is met
 									if (currentBatchBlocks.length >= adaptiveBatchSize) {
+
 										const batchBlocks = [...currentBatchBlocks]
 										const batchTexts = [...currentBatchTexts]
 										const batchFileInfos = [...currentBatchFileInfos]
@@ -189,10 +192,12 @@ export class DirectoryScanner implements IDirectoryScanner {
 										currentBatchTexts = []
 										currentBatchFileInfos = []
 
+
 										// Queue batch processing with performance tracking
 										const batchPromise = batchLimiter(async () => {
 											const startTime = Date.now()
 											await this.processRobustBatch(
+
 												batchBlocks,
 												batchTexts,
 												batchFileInfos,
@@ -212,6 +217,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 										activeBatchPromises.add(batchPromise)
 										batchPromise.finally(() => {
 											activeBatchPromises.delete(batchPromise)
+											pendingBatchCount--
 										})
 									}
 								} finally {
@@ -272,6 +278,8 @@ export class DirectoryScanner implements IDirectoryScanner {
 				currentBatchTexts = []
 				currentBatchFileInfos = []
 
+
+
 				const batchPromise = batchLimiter(() =>
 					this.processRobustBatch(
 						batchBlocks,
@@ -285,6 +293,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 				activeBatchPromises.add(batchPromise)
 				batchPromise.finally(() => {
 					activeBatchPromises.delete(batchPromise)
+					pendingBatchCount--
 				})
 			} finally {
 				release()

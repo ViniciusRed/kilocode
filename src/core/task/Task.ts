@@ -25,6 +25,7 @@ import {
 	TelemetryEventName,
 	TodoItem,
 	getApiProtocol,
+	getModelId,
 } from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
 import { CloudService } from "@roo-code/cloud"
@@ -1237,8 +1238,9 @@ export class Task extends EventEmitter<ClineEvents> {
 		// take a few seconds. For the best UX we show a placeholder api_req_started
 		// message with a loading spinner as this happens.
 
-		// Determine API protocol based on provider
-		const apiProtocol = getApiProtocol(this.apiConfiguration.apiProvider)
+		// Determine API protocol based on provider and model
+		const modelId = getModelId(this.apiConfiguration)
+		const apiProtocol = getApiProtocol(this.apiConfiguration.apiProvider, modelId)
 
 		await this.say(
 			"api_req_started",
@@ -1298,6 +1300,7 @@ export class Task extends EventEmitter<ClineEvents> {
 			let inputTokens = 0
 			let outputTokens = 0
 			let totalCost: number | undefined
+			let usageMissing = false // kilocode_change
 
 			// We can't use `api_req_finished` anymore since it's a unique case
 			// where it could come after a streaming message (i.e. in the middle
@@ -1307,6 +1310,12 @@ export class Task extends EventEmitter<ClineEvents> {
 			// of prices in tasks from history (it's worth removing a few months
 			// from now).
 			const updateApiReqMsg = (cancelReason?: ClineApiReqCancelReason, streamingFailedMessage?: string) => {
+				// kilocode_change start: pending upstream pr https://github.com/RooCodeInc/Roo-Code/pull/6122
+				if (lastApiReqIndex < 0 || !this.clineMessages[lastApiReqIndex]) {
+					return
+				}
+				// kilocode_change end
+
 				const existingData = JSON.parse(this.clineMessages[lastApiReqIndex].text || "{}")
 				this.clineMessages[lastApiReqIndex].text = JSON.stringify({
 					...existingData,
@@ -1323,6 +1332,7 @@ export class Task extends EventEmitter<ClineEvents> {
 							cacheWriteTokens,
 							cacheReadTokens,
 						),
+					usageMissing, // kilocode_change
 					cancelReason,
 					streamingFailedMessage,
 				} satisfies ClineApiReqInfo)
@@ -1473,52 +1483,183 @@ export class Task extends EventEmitter<ClineEvents> {
 					}
 				}
 
-				// kilocode_change start: continue stream in background to ensure we have all usage info
-				const drainStreamInBackground = async () => {
-					const prefix = `[Request ${lastApiReqIndex}]`
-					console.debug(`${prefix} Parsing assistant messages done, continuing stream in background...`)
-					let usageFound = false
-					while (!item.done) {
-						const chunk = item.value
-						item = await iterator.next()
-						if (chunk && chunk.type === "usage") {
-							usageFound = true
-							inputTokens += chunk.inputTokens
-							outputTokens += chunk.outputTokens
-							cacheWriteTokens += chunk.cacheWriteTokens ?? 0
-							cacheReadTokens += chunk.cacheReadTokens ?? 0
-							totalCost = chunk.totalCost
+				// kilocode_change start: pending upstream pr https://github.com/RooCodeInc/Roo-Code/pull/6122
+				// Create a copy of current token values to avoid race conditions
+				const currentTokens = {
+					input: inputTokens,
+					output: outputTokens,
+					cacheWrite: cacheWriteTokens,
+					cacheRead: cacheReadTokens,
+					total: totalCost,
+				}
+
+				const drainStreamInBackgroundToFindAllUsage = async (apiReqIndex: number) => {
+					const timeoutMs = 30_000
+					const startTime = Date.now()
+
+					// Local variables to accumulate usage data without affecting the main flow
+					let bgInputTokens = currentTokens.input
+					let bgOutputTokens = currentTokens.output
+					let bgCacheWriteTokens = currentTokens.cacheWrite
+					let bgCacheReadTokens = currentTokens.cacheRead
+					let bgTotalCost = currentTokens.total
+
+					const refreshApiReqMsg = async (messageIndex: number) => {
+						// Update the API request message with the latest usage data
+						updateApiReqMsg()
+						await this.saveClineMessages()
+
+						// Update the specific message in the webview
+						const apiReqMessage = this.clineMessages[messageIndex]
+						if (apiReqMessage) {
+							await this.updateClineMessage(apiReqMessage)
 						}
 					}
-					if (usageFound) {
-						console.debug(`${prefix} Stream done, updating request message with usage info`)
-						updateApiReqMsg()
-					} else {
-						console.debug(`${prefix} Stream done`)
+
+					// Helper function to capture telemetry and update messages
+					const captureUsageData = async (
+						tokens: {
+							input: number
+							output: number
+							cacheWrite: number
+							cacheRead: number
+							total?: number
+						},
+						messageIndex: number = apiReqIndex,
+					) => {
+						if (tokens.input > 0 || tokens.output > 0 || tokens.cacheWrite > 0 || tokens.cacheRead > 0) {
+							// Update the shared variables atomically
+							inputTokens = tokens.input
+							outputTokens = tokens.output
+							cacheWriteTokens = tokens.cacheWrite
+							cacheReadTokens = tokens.cacheRead
+							totalCost = tokens.total
+
+							refreshApiReqMsg(messageIndex)
+
+							// Capture telemetry
+							TelemetryService.instance.captureLlmCompletion(this.taskId, {
+								inputTokens: tokens.input,
+								outputTokens: tokens.output,
+								cacheWriteTokens: tokens.cacheWrite,
+								cacheReadTokens: tokens.cacheRead,
+								cost:
+									tokens.total ??
+									calculateApiCostAnthropic(
+										this.api.getModel().info,
+										tokens.input,
+										tokens.output,
+										tokens.cacheWrite,
+										tokens.cacheRead,
+									),
+							})
+						}
 					}
-					if (inputTokens > 0 || outputTokens > 0 || cacheWriteTokens > 0 || cacheReadTokens > 0) {
-						TelemetryService.instance.captureLlmCompletion(this.taskId, {
-							inputTokens,
-							outputTokens,
-							cacheWriteTokens,
-							cacheReadTokens,
-							cost:
-								totalCost ??
-								calculateApiCostAnthropic(
-									this.api.getModel().info,
-									inputTokens,
-									outputTokens,
-									cacheWriteTokens,
-									cacheReadTokens,
-								),
-						})
-					} else {
-						console.warn(`${prefix} No usage data after the stream completed`)
+
+					try {
+						const modelId = this.api.getModel().id
+						let usageFound = false
+						let chunkCount = 0
+						while (!item.done) {
+							// Check for timeout
+							const time = Date.now() - startTime
+							if (this.abort || time > timeoutMs) {
+								console.warn(
+									`[Background Usage Collection] Cancelled after ${time}ms for model: ${modelId}, processed ${chunkCount} chunks`,
+								)
+								iterator.return(undefined)
+								break
+							}
+
+							const chunk = item.value
+							item = await iterator.next()
+							chunkCount++
+
+							if (chunk && chunk.type === "usage") {
+								usageFound = true
+								bgInputTokens += chunk.inputTokens
+								bgOutputTokens += chunk.outputTokens
+								bgCacheWriteTokens += chunk.cacheWriteTokens ?? 0
+								bgCacheReadTokens += chunk.cacheReadTokens ?? 0
+								bgTotalCost = chunk.totalCost
+							}
+						}
+
+						if (usageFound) {
+							await captureUsageData(
+								{
+									input: bgInputTokens,
+									output: bgOutputTokens,
+									cacheWrite: bgCacheWriteTokens,
+									cacheRead: bgCacheReadTokens,
+									total: bgTotalCost,
+								},
+								lastApiReqIndex,
+							)
+						} else if (
+							bgInputTokens > 0 ||
+							bgOutputTokens > 0 ||
+							bgCacheWriteTokens > 0 ||
+							bgCacheReadTokens > 0
+						) {
+							// We have some usage data even if we didn't find a usage chunk
+							await captureUsageData(
+								{
+									input: bgInputTokens,
+									output: bgOutputTokens,
+									cacheWrite: bgCacheWriteTokens,
+									cacheRead: bgCacheReadTokens,
+									total: bgTotalCost,
+								},
+								lastApiReqIndex,
+							)
+						} else {
+							console.warn(
+								`[Background Usage Collection] Suspicious: request ${apiReqIndex} is complete, but no usage info was found. Model: ${modelId}`,
+							)
+							usageMissing = true
+							refreshApiReqMsg(apiReqIndex)
+						}
+					} catch (error) {
+						console.error("Error draining stream for usage data:", error)
+						// Still try to capture whatever usage data we have collected so far
+						if (
+							bgInputTokens > 0 ||
+							bgOutputTokens > 0 ||
+							bgCacheWriteTokens > 0 ||
+							bgCacheReadTokens > 0
+						) {
+							await captureUsageData(
+								{
+									input: bgInputTokens,
+									output: bgOutputTokens,
+									cacheWrite: bgCacheWriteTokens,
+									cacheRead: bgCacheReadTokens,
+									total: bgTotalCost,
+								},
+								lastApiReqIndex,
+							)
+						} else {
+							usageMissing = true
+							refreshApiReqMsg(apiReqIndex)
+						}
 					}
 				}
-				drainStreamInBackground() // no await so it runs in the background
+
+				// Start the background task and handle any errors
+				drainStreamInBackgroundToFindAllUsage(lastApiReqIndex).catch((error) => {
+					console.error("Background usage collection failed:", error)
+				})
 				// kilocode_change end
 			} catch (error) {
+				// kilocode_change start
+				TelemetryService.instance.captureException(error, {
+					abandoned: this.abandoned,
+					abort: this.abort,
+					source: "recursivelyMakeClineRequests",
+				})
+				// kilocode_change end
+
 				// Abandoned happens when extension is no longer waiting for the
 				// Cline instance to finish aborting (error is thrown here when
 				// any function in the for loop throws due to this.abort).
@@ -1527,15 +1668,17 @@ export class Task extends EventEmitter<ClineEvents> {
 					// could be in (i.e. could have streamed some tools the user
 					// may have executed), so we just resort to replicating a
 					// cancel task.
-					this.abortTask()
 
-					// Check if this was a user-initiated cancellation
-					// If this.abort is true, it means the user clicked cancel, so we should
+					// Check if this was a user-initiated cancellation BEFORE calling abortTask
+					// If this.abort is already true, it means the user clicked cancel, so we should
 					// treat this as "user_cancelled" rather than "streaming_failed"
 					const cancelReason = this.abort ? "user_cancelled" : "streaming_failed"
 					const streamingFailedMessage = this.abort
 						? undefined
 						: (error.message ?? JSON.stringify(serializeError(error), null, 2))
+
+					// Now call abortTask after determining the cancel reason
+					await this.abortTask()
 
 					await abortStream(cancelReason, streamingFailedMessage)
 
@@ -1549,7 +1692,7 @@ export class Task extends EventEmitter<ClineEvents> {
 				this.isStreaming = false
 			}
 
-			// kilocode_change: this was moved to the drainStreamInBackground() function above
+			// kilocode_change: pending upstream pr https://github.com/RooCodeInc/Roo-Code/pull/6122
 			//if (inputTokens > 0 || outputTokens > 0 || cacheWriteTokens > 0 || cacheReadTokens > 0) {
 			//	TelemetryService.instance.captureLlmCompletion(this.taskId, {
 			//		inputTokens,

@@ -14,6 +14,8 @@ import { TelemetryEventName } from "@roo-code/types"
 export class CodeIndexOrchestrator {
 	private _fileWatcherSubscriptions: vscode.Disposable[] = []
 	private _isProcessing: boolean = false
+	private _shouldStop: boolean = false
+	private _watcherStarted: boolean = false
 
 	constructor(
 		private readonly configManager: CodeIndexConfigManager,
@@ -33,10 +35,21 @@ export class CodeIndexOrchestrator {
 			throw new Error("Cannot start watcher: Service not configured.")
 		}
 
+		if (this._shouldStop) {
+			console.log("[CodeIndexOrchestrator] Watcher start cancelled due to stop signal.")
+			return
+		}
+
 		this.stateManager.setSystemState("Indexing", "Initializing file watcher...")
 
 		try {
 			await this.fileWatcher.initialize()
+
+			if (this._shouldStop) {
+				console.log("[CodeIndexOrchestrator] Watcher initialization cancelled due to stop signal.")
+				this.fileWatcher.dispose()
+				return
+			}
 
 			this._fileWatcherSubscriptions = [
 				this.fileWatcher.onDidStartBatchProcessing((filePaths: string[]) => {}),
@@ -75,6 +88,8 @@ export class CodeIndexOrchestrator {
 					}
 				}),
 			]
+
+			this._watcherStarted = true
 		} catch (error) {
 			console.error("[CodeIndexOrchestrator] Failed to start file watcher:", error)
 			TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
@@ -112,14 +127,34 @@ export class CodeIndexOrchestrator {
 			return
 		}
 
+		// Reset stop flag and processing state when starting
+		this._shouldStop = false
 		this._isProcessing = true
 		this.stateManager.setSystemState("Indexing", "Initializing services...")
 
 		try {
+			// Check for stop signal early
+			if (this._shouldStop) {
+				console.log("[CodeIndexOrchestrator] Indexing cancelled before vector store initialization.")
+				return
+			}
+
 			const collectionCreated = await this.vectorStore.initialize()
+
+			// Check for stop signal after major async operations
+			if (this._shouldStop) {
+				console.log("[CodeIndexOrchestrator] Indexing cancelled after vector store initialization.")
+				this.stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
+				return
+			}
 
 			if (collectionCreated) {
 				await this.cacheManager.clearCacheFile()
+			}
+
+			if (this._shouldStop) {
+				console.log("[CodeIndexOrchestrator] Indexing cancelled after cache clear.")
+				return
 			}
 
 			this.stateManager.setSystemState("Indexing", "Services ready. Starting workspace scan...")
@@ -134,6 +169,9 @@ export class CodeIndexOrchestrator {
 			}
 
 			const handleBlocksIndexed = (indexedCount: number) => {
+				if (this._shouldStop) {
+					return
+				}
 				cumulativeBlocksIndexed += indexedCount
 				this.stateManager.reportBlockIndexingProgress(cumulativeBlocksIndexed, cumulativeBlocksFoundSoFar)
 			}
@@ -141,6 +179,10 @@ export class CodeIndexOrchestrator {
 			const result = await this.scanner.scanDirectory(
 				this.workspacePath,
 				(batchError: Error) => {
+					if (this._shouldStop) {
+						console.log("[CodeIndexOrchestrator] Batch error callback skipped due to stop signal")
+						return
+					}
 					console.error(
 						`[CodeIndexOrchestrator] Error during initial scan batch: ${batchError.message}`,
 						batchError,
@@ -150,6 +192,13 @@ export class CodeIndexOrchestrator {
 				handleBlocksIndexed,
 				handleFileParsed,
 			)
+
+			// Check if we were asked to stop during scanning
+			if (this._shouldStop) {
+				console.log("[CodeIndexOrchestrator] Indexing cancelled during directory scan.")
+				this.stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
+				return
+			}
 
 			if (!result) {
 				throw new Error("Scan failed, is scanner initialized?")
@@ -196,9 +245,21 @@ export class CodeIndexOrchestrator {
 				)
 			}
 
+			// Check before starting watcher
+			if (this._shouldStop) {
+				console.log("[CodeIndexOrchestrator] Indexing cancelled before starting watcher.")
+				this.stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
+				return
+			}
+
 			await this._startWatcher()
 
-			this.stateManager.setSystemState("Indexed", "File watcher started.")
+			// Only set to Indexed if we haven't been asked to stop
+			if (!this._shouldStop && this._watcherStarted) {
+				this.stateManager.setSystemState("Indexed", "File watcher started.")
+			} else if (this._shouldStop) {
+				this.stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
+			}
 		} catch (error: any) {
 			console.error("[CodeIndexOrchestrator] Error during indexing:", error)
 			TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
@@ -206,20 +267,29 @@ export class CodeIndexOrchestrator {
 				stack: error instanceof Error ? error.stack : undefined,
 				location: "startIndexing",
 			})
-			try {
-				await this.vectorStore.clearCollection()
-			} catch (cleanupError) {
-				console.error("[CodeIndexOrchestrator] Failed to clean up after error:", cleanupError)
-				TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
-					error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-					stack: cleanupError instanceof Error ? cleanupError.stack : undefined,
-					location: "startIndexing.cleanup",
-				})
+
+			// Only clean up if we haven't been asked to stop
+			if (!this._shouldStop) {
+				try {
+					await this.vectorStore.clearCollection()
+				} catch (cleanupError) {
+					console.error("[CodeIndexOrchestrator] Failed to clean up after error:", cleanupError)
+					TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
+						error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+						stack: cleanupError instanceof Error ? cleanupError.stack : undefined,
+						location: "startIndexing.cleanup",
+					})
+				}
+
+				await this.cacheManager.clearCacheFile()
+				this.stateManager.setSystemState(
+					"Error",
+					`Failed during initial scan: ${error.message || "Unknown error"}`,
+				)
+			} else {
+				this.stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
 			}
 
-			await this.cacheManager.clearCacheFile()
-
-			this.stateManager.setSystemState("Error", `Failed during initial scan: ${error.message || "Unknown error"}`)
 			this.stopWatcher()
 		} finally {
 			this._isProcessing = false
@@ -230,14 +300,42 @@ export class CodeIndexOrchestrator {
 	 * Stops the file watcher and cleans up resources.
 	 */
 	public stopWatcher(): void {
-		this.fileWatcher.dispose()
-		this._fileWatcherSubscriptions.forEach((sub) => sub.dispose())
+		// Set the stop flag to signal all ongoing operations to stop
+		this._shouldStop = true
+
+		// Dispose of file watcher first
+		try {
+			console.log("[CodeIndexOrchestrator] Disposing file watcher...")
+			this.fileWatcher.dispose()
+			console.log("[CodeIndexOrchestrator] File watcher disposed")
+		} catch (error) {
+			console.error("[CodeIndexOrchestrator] Error disposing file watcher:", error)
+		}
+
+		// Clean up subscriptions
+		console.log("[CodeIndexOrchestrator] Cleaning up subscriptions...")
+		this._fileWatcherSubscriptions.forEach((sub) => {
+			try {
+				sub.dispose()
+			} catch (error) {
+				console.error("[CodeIndexOrchestrator] Error disposing subscription:", error)
+			}
+		})
 		this._fileWatcherSubscriptions = []
 
-		if (this.stateManager.state !== "Error") {
-			this.stateManager.setSystemState("Standby", "File watcher stopped.")
-		}
+		// Reset flags
+		this._watcherStarted = false
 		this._isProcessing = false
+
+		// Only update state if not in error state
+		if (this.stateManager.state !== "Error") {
+			console.log("[CodeIndexOrchestrator] Updating state to Standby")
+			this.stateManager.setSystemState("Standby", "File watcher stopped.")
+		} else {
+			console.log("[CodeIndexOrchestrator] State remains in Error")
+		}
+
+		console.log("[CodeIndexOrchestrator] Watcher stopped successfully")
 	}
 
 	/**
@@ -245,10 +343,16 @@ export class CodeIndexOrchestrator {
 	 * and resetting the cache file.
 	 */
 	public async clearIndexData(): Promise<void> {
+		// Signal that we want to stop everything
+		this._shouldStop = true
 		this._isProcessing = true
 
 		try {
-			await this.stopWatcher()
+			// Stop watcher first
+			this.stopWatcher()
+
+			// Wait a bit to ensure any async operations see the stop flag
+			await new Promise((resolve) => setTimeout(resolve, 100))
 
 			try {
 				if (this.configManager.isFeatureConfigured) {
@@ -273,6 +377,8 @@ export class CodeIndexOrchestrator {
 			}
 		} finally {
 			this._isProcessing = false
+			// Reset the stop flag after clearing is complete
+			this._shouldStop = false
 		}
 	}
 
@@ -281,5 +387,19 @@ export class CodeIndexOrchestrator {
 	 */
 	public get state(): IndexingState {
 		return this.stateManager.state
+	}
+
+	/**
+	 * Checks if the orchestrator is currently processing.
+	 */
+	public get isProcessing(): boolean {
+		return this._isProcessing
+	}
+
+	/**
+	 * Checks if a stop has been requested.
+	 */
+	public get shouldStop(): boolean {
+		return this._shouldStop
 	}
 }

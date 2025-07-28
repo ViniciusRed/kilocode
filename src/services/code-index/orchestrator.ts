@@ -127,7 +127,7 @@ export class CodeIndexOrchestrator {
 			return
 		}
 
-		// Reset stop flag when starting
+		// Reset stop flag and processing state when starting
 		this._shouldStop = false
 		this._isProcessing = true
 		this.stateManager.setSystemState("Indexing", "Initializing services...")
@@ -180,6 +180,7 @@ export class CodeIndexOrchestrator {
 				this.workspacePath,
 				(batchError: Error) => {
 					if (this._shouldStop) {
+						console.log("[CodeIndexOrchestrator] Batch error callback skipped due to stop signal")
 						return
 					}
 					console.error(
@@ -304,12 +305,15 @@ export class CodeIndexOrchestrator {
 
 		// Dispose of file watcher first
 		try {
+			console.log("[CodeIndexOrchestrator] Disposing file watcher...")
 			this.fileWatcher.dispose()
+			console.log("[CodeIndexOrchestrator] File watcher disposed")
 		} catch (error) {
 			console.error("[CodeIndexOrchestrator] Error disposing file watcher:", error)
 		}
 
 		// Clean up subscriptions
+		console.log("[CodeIndexOrchestrator] Cleaning up subscriptions...")
 		this._fileWatcherSubscriptions.forEach((sub) => {
 			try {
 				sub.dispose()
@@ -325,8 +329,13 @@ export class CodeIndexOrchestrator {
 
 		// Only update state if not in error state
 		if (this.stateManager.state !== "Error") {
+			console.log("[CodeIndexOrchestrator] Updating state to Standby")
 			this.stateManager.setSystemState("Standby", "File watcher stopped.")
+		} else {
+			console.log("[CodeIndexOrchestrator] State remains in Error")
 		}
+
+		console.log("[CodeIndexOrchestrator] Watcher stopped successfully")
 	}
 
 	/**

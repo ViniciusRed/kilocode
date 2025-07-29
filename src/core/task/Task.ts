@@ -1,9 +1,8 @@
 import * as path from "path"
+import * as vscode from "vscode"
 import os from "os"
 import crypto from "crypto"
 import EventEmitter from "events"
-
-import * as vscode from "vscode" // kilocode_change:
 
 import { Anthropic } from "@anthropic-ai/sdk"
 import delay from "delay"
@@ -98,6 +97,7 @@ import { parseKiloSlashCommands } from "../slash-commands/kilo" // kilocode_chan
 import { GlobalFileNames } from "../../shared/globalFileNames" // kilocode_change
 import { ensureLocalKilorulesDirExists } from "../context/instructions/kilo-rules" // kilocode_change
 import { restoreTodoListForTask } from "../tools/updateTodoListTool"
+import { reportExcessiveRecursion, yieldPromise } from "../kilocode"
 
 // Constants
 const MAX_EXPONENTIAL_BACKOFF_SECONDS = 600 // 10 minutes
@@ -276,7 +276,7 @@ export class Task extends EventEmitter<ClineEvents> {
 		this.consecutiveMistakeLimit = consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
 		this.providerRef = new WeakRef(provider)
 		this.globalStoragePath = provider.context.globalStorageUri.fsPath
-		this.diffViewProvider = new DiffViewProvider(this.cwd)
+		this.diffViewProvider = new DiffViewProvider(this.cwd, this)
 		this.enableCheckpoints = enableCheckpoints
 
 		this.rootTask = rootTask
@@ -1182,7 +1182,9 @@ export class Task extends EventEmitter<ClineEvents> {
 	public async recursivelyMakeClineRequests(
 		userContent: Anthropic.Messages.ContentBlockParam[],
 		includeFileDetails: boolean = false,
+		recursionDepth: number = 0, // kilocode_change
 	): Promise<boolean> {
+		reportExcessiveRecursion(this.recursivelyMakeClineRequests.name, recursionDepth) // kilocode_change
 		if (this.abort) {
 			throw new Error(`[KiloCode#recursivelyMakeClineRequests] task ${this.taskId}.${this.instanceId} aborted`)
 		}
@@ -1251,7 +1253,12 @@ export class Task extends EventEmitter<ClineEvents> {
 			}),
 		)
 
-		const { showRooIgnoredFiles = true } = (await this.providerRef.deref()?.getState()) ?? {}
+		const {
+			showRooIgnoredFiles = true,
+			includeDiagnosticMessages = true,
+			maxDiagnosticMessages = 50,
+			maxReadFileLine = -1,
+		} = (await this.providerRef.deref()?.getState()) ?? {}
 
 		const [parsedUserContent, needsRulesFileCheck] = await processKiloUserContentMentions({
 			context: this.context, // kilocode_change
@@ -1261,6 +1268,9 @@ export class Task extends EventEmitter<ClineEvents> {
 			fileContextTracker: this.fileContextTracker,
 			rooIgnoreController: this.rooIgnoreController,
 			showRooIgnoredFiles,
+			includeDiagnosticMessages,
+			maxDiagnosticMessages,
+			maxReadFileLine,
 		})
 
 		if (needsRulesFileCheck) {
@@ -1495,7 +1505,7 @@ export class Task extends EventEmitter<ClineEvents> {
 
 				const drainStreamInBackgroundToFindAllUsage = async (apiReqIndex: number) => {
 					const timeoutMs = 30_000
-					const startTime = Date.now()
+					const startTime = performance.now()
 
 					// Local variables to accumulate usage data without affecting the main flow
 					let bgInputTokens = currentTokens.input
@@ -1535,7 +1545,7 @@ export class Task extends EventEmitter<ClineEvents> {
 							cacheReadTokens = tokens.cacheRead
 							totalCost = tokens.total
 
-							refreshApiReqMsg(messageIndex)
+							await refreshApiReqMsg(messageIndex)
 
 							// Capture telemetry
 							TelemetryService.instance.captureLlmCompletion(this.taskId, {
@@ -1558,16 +1568,15 @@ export class Task extends EventEmitter<ClineEvents> {
 
 					try {
 						const modelId = this.api.getModel().id
-						let usageFound = false
 						let chunkCount = 0
 						while (!item.done) {
 							// Check for timeout
-							const time = Date.now() - startTime
+							const time = performance.now() - startTime
 							if (this.abort || time > timeoutMs) {
 								console.warn(
 									`[Background Usage Collection] Cancelled after ${time}ms for model: ${modelId}, processed ${chunkCount} chunks`,
 								)
-								iterator.return(undefined)
+								await iterator.return(undefined)
 								break
 							}
 
@@ -1576,7 +1585,6 @@ export class Task extends EventEmitter<ClineEvents> {
 							chunkCount++
 
 							if (chunk && chunk.type === "usage") {
-								usageFound = true
 								bgInputTokens += chunk.inputTokens
 								bgOutputTokens += chunk.outputTokens
 								bgCacheWriteTokens += chunk.cacheWriteTokens ?? 0
@@ -1585,18 +1593,7 @@ export class Task extends EventEmitter<ClineEvents> {
 							}
 						}
 
-						if (usageFound) {
-							await captureUsageData(
-								{
-									input: bgInputTokens,
-									output: bgOutputTokens,
-									cacheWrite: bgCacheWriteTokens,
-									cacheRead: bgCacheReadTokens,
-									total: bgTotalCost,
-								},
-								lastApiReqIndex,
-							)
-						} else if (
+						if (
 							bgInputTokens > 0 ||
 							bgOutputTokens > 0 ||
 							bgCacheWriteTokens > 0 ||
@@ -1618,7 +1615,7 @@ export class Task extends EventEmitter<ClineEvents> {
 								`[Background Usage Collection] Suspicious: request ${apiReqIndex} is complete, but no usage info was found. Model: ${modelId}`,
 							)
 							usageMissing = true
-							refreshApiReqMsg(apiReqIndex)
+							await refreshApiReqMsg(apiReqIndex)
 						}
 					} catch (error) {
 						console.error("Error draining stream for usage data:", error)
@@ -1641,7 +1638,7 @@ export class Task extends EventEmitter<ClineEvents> {
 							)
 						} else {
 							usageMissing = true
-							refreshApiReqMsg(apiReqIndex)
+							await refreshApiReqMsg(apiReqIndex)
 						}
 					}
 				}
@@ -1787,7 +1784,15 @@ export class Task extends EventEmitter<ClineEvents> {
 					this.consecutiveMistakeCount++
 				}
 
-				const recDidEndLoop = await this.recursivelyMakeClineRequests(this.userMessageContent)
+				// kilocode_change start: prevent excessive recursion
+				// e.g. https://github.com/RooCodeInc/Roo-Code/issues/5601#issuecomment-3120612488
+				await yieldPromise()
+				const recDidEndLoop = await this.recursivelyMakeClineRequests(
+					this.userMessageContent,
+					undefined,
+					recursionDepth + 1,
+				)
+				// kilocode_change end
 				didEndLoop = recDidEndLoop
 			} else {
 				// If there's no assistant_responses, that means we got no text
@@ -1962,8 +1967,9 @@ export class Task extends EventEmitter<ClineEvents> {
 				rooIgnoreInstructions,
 				maxReadFileLine !== -1,
 				{
-					maxConcurrentFileReads,
-					todoListEnabled: apiConfiguration?.todoListEnabled,
+					maxConcurrentFileReads: maxConcurrentFileReads ?? 5,
+					todoListEnabled: apiConfiguration?.todoListEnabled ?? true,
+					useAgentRules: vscode.workspace.getConfiguration("roo-cline").get<boolean>("useAgentRules") ?? true,
 				},
 			)
 		})()

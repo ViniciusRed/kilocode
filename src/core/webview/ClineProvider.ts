@@ -117,7 +117,7 @@ export class ClineProvider
 
 	public isViewLaunched = false
 	public settingsImportedAt?: number
-	public readonly latestAnnouncementId = "jul-09-2025-3-23-0" // Update for v3.23.0 announcement
+	public readonly latestAnnouncementId = "jul-26-2025-3-24-0" // Update for v3.24.0 announcement
 	public readonly providerSettingsManager: ProviderSettingsManager
 	public readonly customModesManager: CustomModesManager
 
@@ -163,7 +163,7 @@ export class ClineProvider
 				this.log(`Failed to initialize MCP Hub: ${error}`)
 			})
 
-		this.marketplaceManager = new MarketplaceManager(this.context)
+		this.marketplaceManager = new MarketplaceManager(this.context, this.customModesManager)
 	}
 
 	// Adds a new Cline instance to clineStack, marking the start of a new task.
@@ -1497,7 +1497,6 @@ export class ClineProvider
 			organizationAllowList,
 			maxConcurrentFileReads,
 			allowVeryLargeReads, // kilocode_change
-			autocompleteApiConfigId, // kilocode_change
 			ghostServiceSettings, // kilocode_changes
 			condensingApiConfigId,
 			customCondensingPrompt,
@@ -1505,9 +1504,11 @@ export class ClineProvider
 			codebaseIndexModels,
 			profileThresholds,
 			systemNotificationsEnabled, // kilocode_change
+			dismissedNotificationIds, // kilocode_change
 			alwaysAllowFollowupQuestions,
 			followupAutoApproveTimeoutMs,
-			diagnosticsEnabled,
+			includeDiagnosticMessages,
+			maxDiagnosticMessages,
 		} = await this.getState()
 
 		const telemetryKey = process.env.KILOCODE_POSTHOG_API_KEY
@@ -1613,7 +1614,6 @@ export class ClineProvider
 			cloudIsAuthenticated: cloudIsAuthenticated ?? false,
 			sharingEnabled: sharingEnabled ?? false,
 			organizationAllowList,
-			autocompleteApiConfigId, // kilocode_change
 			ghostServiceSettings: ghostServiceSettings ?? {}, // kilocode_change
 			condensingApiConfigId,
 			customCondensingPrompt,
@@ -1634,9 +1634,11 @@ export class ClineProvider
 			cloudApiUrl: getRooCodeApiUrl(),
 			hasOpenedModeSelector: this.getGlobalState("hasOpenedModeSelector") ?? false,
 			systemNotificationsEnabled: systemNotificationsEnabled ?? false, // kilocode_change
+			dismissedNotificationIds: dismissedNotificationIds ?? [], // kilocode_change
 			alwaysAllowFollowupQuestions: alwaysAllowFollowupQuestions ?? false,
 			followupAutoApproveTimeoutMs: followupAutoApproveTimeoutMs ?? 60000,
-			diagnosticsEnabled: diagnosticsEnabled ?? true,
+			includeDiagnosticMessages: includeDiagnosticMessages ?? true,
+			maxDiagnosticMessages: maxDiagnosticMessages ?? 50,
 		}
 	}
 
@@ -1767,7 +1769,6 @@ export class ClineProvider
 			customSupportPrompts: stateValues.customSupportPrompts ?? {},
 			enhancementApiConfigId: stateValues.enhancementApiConfigId,
 			commitMessageApiConfigId: stateValues.commitMessageApiConfigId, // kilocode_change
-			autocompleteApiConfigId: stateValues.autocompleteApiConfigId, // kilocode_change
 			ghostServiceSettings: stateValues.ghostServiceSettings ?? {}, // kilocode_change
 			experiments: stateValues.experiments ?? experimentDefault,
 			autoApprovalEnabled: stateValues.autoApprovalEnabled ?? true,
@@ -1784,6 +1785,7 @@ export class ClineProvider
 			maxConcurrentFileReads: stateValues.maxConcurrentFileReads ?? 5,
 			allowVeryLargeReads: stateValues.allowVeryLargeReads ?? false, // kilocode_change
 			systemNotificationsEnabled: stateValues.systemNotificationsEnabled ?? true, // kilocode_change
+			dismissedNotificationIds: stateValues.dismissedNotificationIds ?? [], // kilocode_change
 			historyPreviewCollapsed: stateValues.historyPreviewCollapsed ?? false,
 			cloudUserInfo,
 			cloudIsAuthenticated,
@@ -1809,6 +1811,9 @@ export class ClineProvider
 				codebaseIndexSearchMinScore: stateValues.codebaseIndexConfig?.codebaseIndexSearchMinScore,
 			},
 			profileThresholds: stateValues.profileThresholds ?? {},
+			// Add diagnostic message settings
+			includeDiagnosticMessages: stateValues.includeDiagnosticMessages ?? true,
+			maxDiagnosticMessages: stateValues.maxDiagnosticMessages ?? 50,
 		}
 	}
 

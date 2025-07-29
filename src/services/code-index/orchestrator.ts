@@ -7,6 +7,7 @@ import { DirectoryScanner } from "./processors"
 import { CacheManager } from "./cache-manager"
 import { TelemetryService } from "@roo-code/telemetry"
 import { TelemetryEventName } from "@roo-code/types"
+import { t } from "../../i18n"
 
 /**
  * Manages the code indexing workflow, coordinating between different services and managers.
@@ -109,6 +110,13 @@ export class CodeIndexOrchestrator {
 	 * Initiates the indexing process (initial scan and starts watcher).
 	 */
 	public async startIndexing(): Promise<void> {
+		// Check if workspace is available first
+		if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+			this.stateManager.setSystemState("Error", t("embeddings:orchestrator.indexingRequiresWorkspace"))
+			console.warn("[CodeIndexOrchestrator] Start rejected: No workspace folder open.")
+			return
+		}
+
 		if (!this.configManager.isFeatureConfigured) {
 			this.stateManager.setSystemState("Standby", "Missing configuration. Save your settings to start indexing.")
 			console.warn("[CodeIndexOrchestrator] Start rejected: Missing configuration.")
@@ -214,9 +222,7 @@ export class CodeIndexOrchestrator {
 					const firstError = batchErrors[0]
 					throw new Error(`Indexing failed: ${firstError.message}`)
 				} else {
-					throw new Error(
-						"Indexing failed: No code blocks were successfully indexed. This usually indicates an embedder configuration issue.",
-					)
+					throw new Error(t("embeddings:orchestrator.indexingFailedNoBlocks"))
 				}
 			}
 
@@ -240,9 +246,7 @@ export class CodeIndexOrchestrator {
 			// Final sanity check: If we found blocks but indexed none and somehow no errors were reported,
 			// this is still a failure
 			if (cumulativeBlocksFoundSoFar > 0 && cumulativeBlocksIndexed === 0) {
-				throw new Error(
-					"Indexing failed: No code blocks were successfully indexed despite finding files to process. This indicates a critical embedder failure.",
-				)
+				throw new Error(t("embeddings:orchestrator.indexingFailedCritical"))
 			}
 
 			// Check before starting watcher
@@ -256,10 +260,11 @@ export class CodeIndexOrchestrator {
 
 			// Only set to Indexed if we haven't been asked to stop
 			if (!this._shouldStop && this._watcherStarted) {
-				this.stateManager.setSystemState("Indexed", "File watcher started.")
+				this.stateManager.setSystemState("Indexed", t("embeddings:orchestrator.fileWatcherStarted"))
 			} else if (this._shouldStop) {
 				this.stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
 			}
+
 		} catch (error: any) {
 			console.error("[CodeIndexOrchestrator] Error during indexing:", error)
 			TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
@@ -289,6 +294,13 @@ export class CodeIndexOrchestrator {
 			} else {
 				this.stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
 			}
+
+			this.stateManager.setSystemState(
+				"Error",
+				t("embeddings:orchestrator.failedDuringInitialScan", {
+					errorMessage: error.message || t("embeddings:orchestrator.unknownError"),
+				}),
+			)
 
 			this.stopWatcher()
 		} finally {
@@ -329,10 +341,12 @@ export class CodeIndexOrchestrator {
 
 		// Only update state if not in error state
 		if (this.stateManager.state !== "Error") {
+
 			console.log("[CodeIndexOrchestrator] Updating state to Standby")
-			this.stateManager.setSystemState("Standby", "File watcher stopped.")
+			this.stateManager.setSystemState("Standby", t("embeddings:orchestrator.fileWatcherStopped"))
 		} else {
 			console.log("[CodeIndexOrchestrator] State remains in Error")
+
 		}
 
 		console.log("[CodeIndexOrchestrator] Watcher stopped successfully")

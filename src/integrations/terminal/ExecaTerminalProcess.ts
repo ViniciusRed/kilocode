@@ -40,6 +40,7 @@ export class ExecaTerminalProcess extends BaseTerminalProcess {
 				shell: true,
 				cwd: this.terminal.getCurrentWorkingDirectory(),
 				all: true,
+				stdin: "ignore", // kilocode_change: ignore stdin to prevent blocking
 				env: {
 					...process.env,
 					// Ensure UTF-8 encoding for Ruby, CocoaPods, etc.

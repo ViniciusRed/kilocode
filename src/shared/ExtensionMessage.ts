@@ -106,6 +106,7 @@ export interface ExtensionMessage {
 		| "vsCodeSetting"
 		| "profileDataResponse" // kilocode_change
 		| "balanceDataResponse" // kilocode_change
+		| "updateProfileData" // kilocode_change
 		| "authenticatedUser"
 		| "condenseTaskContextResponse"
 		| "singleRouterModelFetchResponse"
@@ -296,6 +297,7 @@ export type ExtensionState = Pick<
 	| "localRulesToggles" // kilocode_change
 	| "globalWorkflowToggles" // kilocode_change
 	| "commitMessageApiConfigId" // kilocode_change
+	| "terminalCommandApiConfigId" // kilocode_change
 	| "dismissedNotificationIds" // kilocode_change
 	| "ghostServiceSettings" // kilocode_change
 	| "condensingApiConfigId"

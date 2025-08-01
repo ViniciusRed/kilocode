@@ -76,6 +76,7 @@ import { getWorkspaceGitInfo } from "../../utils/git"
 import { McpDownloadResponse, McpMarketplaceCatalog } from "../../shared/kilocode/mcp" //kilocode_change
 import { McpServer } from "../../shared/mcp" // kilocode_change
 import { OpenRouterHandler } from "../../api/providers" // kilocode_change
+import { stringifyError } from "../../shared/kilocode/errorUtils"
 
 /**
  * https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/default/weather-webview/src/providers/WeatherViewProvider.ts
@@ -410,7 +411,7 @@ export class ClineProvider
 		this.getState().then(
 			({
 				terminalShellIntegrationTimeout = Terminal.defaultShellIntegrationTimeout,
-				terminalShellIntegrationDisabled = false,
+				terminalShellIntegrationDisabled = true, // kilocode_change: default
 				terminalCommandDelay = 0,
 				terminalZshClearEolMark = true,
 				terminalZshOhMy = false,
@@ -688,7 +689,7 @@ export class ClineProvider
 			"default-src 'none'",
 			`font-src ${webview.cspSource} data:`,
 			`style-src ${webview.cspSource} 'unsafe-inline' https://* http://${localServerUrl} http://0.0.0.0:${localPort}`,
-			`img-src ${webview.cspSource} https://storage.googleapis.com https://img.clerk.com data: https://*.googleusercontent.com https://*.googleapis.com`, // kilocode_change: add https://*.googleusercontent.com and https://*.googleapis.com
+			`img-src ${webview.cspSource} https://storage.googleapis.com https://img.clerk.com data: https://*.googleusercontent.com https://*.googleapis.com https://*.githubusercontent.com`, // kilocode_change: add https://*.googleusercontent.com and https://*.googleapis.com and https://*.githubusercontent.com
 			`media-src ${webview.cspSource}`,
 			`script-src 'unsafe-eval' ${webview.cspSource} https://* https://*.posthog.com http://${localServerUrl} http://0.0.0.0:${localPort} 'nonce-${nonce}'`,
 			`connect-src ${webview.cspSource} https://* https://*.posthog.com ws://${localServerUrl} ws://0.0.0.0:${localPort} http://${localServerUrl} http://0.0.0.0:${localPort}`,
@@ -773,8 +774,8 @@ export class ClineProvider
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
             <meta name="theme-color" content="#000000">
-			<!-- kilocode_change: add https://*.googleusercontent.com https://*.googleapis.com to img-src, https://* to connect-src -->
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https://*.googleusercontent.com https://storage.googleapis.com https://img.clerk.com data: https://*.googleapis.com; media-src ${webview.cspSource}; script-src ${webview.cspSource} 'wasm-unsafe-eval' 'nonce-${nonce}' https://us-assets.i.posthog.com 'strict-dynamic'; connect-src ${webview.cspSource} https://* https://openrouter.ai https://api.requesty.ai https://us.i.posthog.com https://us-assets.i.posthog.com;">
+			<!-- kilocode_change: add https://*.googleusercontent.com https://*.googleapis.com https://*.githubusercontent.com to img-src, https://* to connect-src -->
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https://*.googleusercontent.com https://storage.googleapis.com https://*.githubusercontent.com https://img.clerk.com data: https://*.googleapis.com; media-src ${webview.cspSource}; script-src ${webview.cspSource} 'wasm-unsafe-eval' 'nonce-${nonce}' https://us-assets.i.posthog.com 'strict-dynamic'; connect-src ${webview.cspSource} https://* https://openrouter.ai https://api.requesty.ai https://us.i.posthog.com https://us-assets.i.posthog.com;">
             <link rel="stylesheet" type="text/css" href="${stylesUri}">
 			<link href="${codiconsUri}" rel="stylesheet" />
 			<script nonce="${nonce}">
@@ -1477,6 +1478,7 @@ export class ClineProvider
 			customSupportPrompts,
 			enhancementApiConfigId,
 			commitMessageApiConfigId, // kilocode_change
+			terminalCommandApiConfigId, // kilocode_change
 			autoApprovalEnabled,
 			customModes,
 			experiments,
@@ -1567,7 +1569,7 @@ export class ClineProvider
 			terminalOutputLineLimit: terminalOutputLineLimit ?? 500,
 			terminalOutputCharacterLimit: terminalOutputCharacterLimit ?? DEFAULT_TERMINAL_OUTPUT_CHARACTER_LIMIT,
 			terminalShellIntegrationTimeout: terminalShellIntegrationTimeout ?? Terminal.defaultShellIntegrationTimeout,
-			terminalShellIntegrationDisabled: terminalShellIntegrationDisabled ?? false,
+			terminalShellIntegrationDisabled: terminalShellIntegrationDisabled ?? true, // kilocode_change: default
 			terminalCommandDelay: terminalCommandDelay ?? 0,
 			terminalPowershellCounter: terminalPowershellCounter ?? false,
 			terminalZshClearEolMark: terminalZshClearEolMark ?? true,
@@ -1587,6 +1589,7 @@ export class ClineProvider
 			customSupportPrompts: customSupportPrompts ?? {},
 			enhancementApiConfigId,
 			commitMessageApiConfigId, // kilocode_change
+			terminalCommandApiConfigId, // kilocode_change
 			autoApprovalEnabled: autoApprovalEnabled ?? true,
 			customModes,
 			experiments: experiments ?? experimentDefault,
@@ -1747,7 +1750,7 @@ export class ClineProvider
 				stateValues.terminalOutputCharacterLimit ?? DEFAULT_TERMINAL_OUTPUT_CHARACTER_LIMIT,
 			terminalShellIntegrationTimeout:
 				stateValues.terminalShellIntegrationTimeout ?? Terminal.defaultShellIntegrationTimeout,
-			terminalShellIntegrationDisabled: stateValues.terminalShellIntegrationDisabled ?? false,
+			terminalShellIntegrationDisabled: stateValues.terminalShellIntegrationDisabled ?? true, // kilocode_change: default
 			terminalCommandDelay: stateValues.terminalCommandDelay ?? 0,
 			terminalPowershellCounter: stateValues.terminalPowershellCounter ?? false,
 			terminalZshClearEolMark: stateValues.terminalZshClearEolMark ?? true,
@@ -1769,6 +1772,7 @@ export class ClineProvider
 			customSupportPrompts: stateValues.customSupportPrompts ?? {},
 			enhancementApiConfigId: stateValues.enhancementApiConfigId,
 			commitMessageApiConfigId: stateValues.commitMessageApiConfigId, // kilocode_change
+			terminalCommandApiConfigId: stateValues.terminalCommandApiConfigId, // kilocode_change
 			ghostServiceSettings: stateValues.ghostServiceSettings ?? {}, // kilocode_change
 			experiments: stateValues.experiments ?? experimentDefault,
 			autoApprovalEnabled: stateValues.autoApprovalEnabled ?? true,
@@ -1942,7 +1946,12 @@ export class ClineProvider
 	 * like the current mode, API provider, git repository information, etc.
 	 */
 	public async getTelemetryProperties(): Promise<TelemetryProperties> {
-		const { mode, apiConfiguration, language } = await this.getState()
+		const {
+			mode,
+			apiConfiguration,
+			language,
+			experiments, // kilocode_change
+		} = await this.getState()
 		const task = this.getCurrentCline()
 
 		const packageJSON = this.context.extension?.packageJSON
@@ -1972,7 +1981,32 @@ export class ClineProvider
 				}
 			} catch (error) {
 				return {
-					exception: error instanceof Error ? error.stack || error.message : String(error),
+					modelException: stringifyError(error),
+				}
+			}
+		}
+
+		function getMemory() {
+			try {
+				return { memory: { ...process.memoryUsage() } }
+			} catch (error) {
+				return {
+					memoryException: stringifyError(error),
+				}
+			}
+		}
+
+		function getFastApply() {
+			try {
+				return {
+					fastApply: {
+						morphFastApply: Boolean(experiments.morphFastApply),
+						morphApiKey: Boolean(apiConfiguration.morphApiKey),
+					},
+				}
+			} catch (error) {
+				return {
+					fastApplyException: stringifyError(error),
 				}
 			}
 		}
@@ -2001,7 +2035,11 @@ export class ClineProvider
 			language,
 			mode,
 			apiProvider: apiConfiguration?.apiProvider,
-			...(await getModelId()), // kilocode_change
+			// kilocode_change start
+			...(await getModelId()),
+			...getMemory(),
+			...getFastApply(),
+			// kilocode_change end
 			diffStrategy: task?.diffStrategy?.getName(),
 			isSubtask: task ? !!task.parentTask : undefined,
 			cloudIsAuthenticated,

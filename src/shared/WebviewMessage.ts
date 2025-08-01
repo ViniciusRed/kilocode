@@ -151,6 +151,7 @@ export interface WebviewMessage {
 		| "systemPrompt"
 		| "enhancementApiConfigId"
 		| "commitMessageApiConfigId" // kilocode_change
+		| "terminalCommandApiConfigId" // kilocode_change
 		| "ghostServiceSettings" // kilocode_change
 		| "updateExperimental"
 		| "autoApprovalEnabled"
@@ -194,7 +195,9 @@ export interface WebviewMessage {
 		| "fetchProfileDataRequest" // kilocode_change
 		| "profileDataResponse" // kilocode_change
 		| "fetchBalanceDataRequest" // kilocode_change
+		| "shopBuyCredits" // kilocode_change
 		| "balanceDataResponse" // kilocode_change
+		| "updateProfileData" // kilocode_change
 		| "condense" // kilocode_change
 		| "toggleWorkflow" // kilocode_change
 		| "refreshRules" // kilocode_change

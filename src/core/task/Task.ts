@@ -1184,7 +1184,7 @@ export class Task extends EventEmitter<ClineEvents> {
 		includeFileDetails: boolean = false,
 		recursionDepth: number = 0, // kilocode_change
 	): Promise<boolean> {
-		reportExcessiveRecursion(this.recursivelyMakeClineRequests.name, recursionDepth) // kilocode_change
+		reportExcessiveRecursion("recursivelyMakeClineRequests", recursionDepth) // kilocode_change
 		if (this.abort) {
 			throw new Error(`[KiloCode#recursivelyMakeClineRequests] task ${this.taskId}.${this.instanceId} aborted`)
 		}
@@ -1653,7 +1653,7 @@ export class Task extends EventEmitter<ClineEvents> {
 				TelemetryService.instance.captureException(error, {
 					abandoned: this.abandoned,
 					abort: this.abort,
-					source: "recursivelyMakeClineRequests",
+					context: "recursivelyMakeClineRequests",
 				})
 				// kilocode_change end
 

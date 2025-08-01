@@ -1373,11 +1373,19 @@ export const webviewMessageHandler = async (
 			await updateGlobalState("enhancementApiConfigId", message.text)
 			await provider.postStateToWebview()
 			break
-		// kilocode_change start
+		// kilocode_change start - commitMessageApiConfigId
 		case "commitMessageApiConfigId":
 			await updateGlobalState("commitMessageApiConfigId", message.text)
 			await provider.postStateToWebview()
 			break
+		// kilocode_change end - commitMessageApiConfigId
+		// kilocode_change start - terminalCommandApiConfigId
+		case "terminalCommandApiConfigId":
+			await updateGlobalState("terminalCommandApiConfigId", message.text)
+			await provider.postStateToWebview()
+			break
+		// kilocode_change end - terminalCommandApiConfigId
+		// kilocode_change start - ghostServiceSettings
 		case "ghostServiceSettings":
 			if (!message.values) {
 				return
@@ -1388,7 +1396,7 @@ export const webviewMessageHandler = async (
 			await provider.postStateToWebview()
 			vscode.commands.executeCommand("kilo-code.ghost.reload")
 			break
-		// kilocode_change end
+		// kilocode_change end - ghostServiceSettings
 		case "condensingApiConfigId":
 			await updateGlobalState("condensingApiConfigId", message.text)
 			await provider.postStateToWebview()
@@ -2118,6 +2126,44 @@ export const webviewMessageHandler = async (
 				provider.postMessageToWebview({
 					type: "balanceDataResponse", // New response type
 					payload: { success: false, error: errorMessage },
+				})
+			}
+			break
+		case "shopBuyCredits": // New handler
+			try {
+				const { apiConfiguration } = await provider.getState()
+				const kilocodeToken = apiConfiguration?.kilocodeToken
+				if (!kilocodeToken) {
+					provider.log("KiloCode token not found in extension state for buy credits.")
+					break
+				}
+				const credits = message.values?.credits || 50
+				const uriScheme = message.values?.uriScheme || "vscode"
+				const uiKind = message.values?.uiKind || "Desktop"
+				const source = uiKind === "Web" ? "web" : uriScheme
+
+				const response = await axios.post(
+					`https://kilocode.ai/payments/topup?origin=extension&source=${source}&amount=${credits}`,
+					{},
+					{
+						headers: {
+							Authorization: `Bearer ${kilocodeToken}`,
+							"Content-Type": "application/json",
+						},
+						maxRedirects: 0, // Prevent axios from following redirects automatically
+						validateStatus: (status) => status < 400, // Accept 3xx status codes
+					},
+				)
+				if (response.status !== 303 || !response.headers.location) {
+					return
+				}
+				await vscode.env.openExternal(vscode.Uri.parse(response.headers.location))
+			} catch (error: any) {
+				const errorMessage = error?.message || "Unknown error";
+				const errorStack = error?.stack ? ` Stack: ${error.stack}` : "";
+				provider.log(`Error redirecting to payment page: ${errorMessage}.${errorStack}`);
+				provider.postMessageToWebview({
+					type: "updateProfileData",
 				})
 			}
 			break

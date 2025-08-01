@@ -31,7 +31,7 @@ interface CommandExecutionProps {
 
 export const CommandExecution = ({ executionId, text, icon, title }: CommandExecutionProps) => {
 	const {
-		terminalShellIntegrationDisabled = false,
+		terminalShellIntegrationDisabled = true, // kilocode_change: default
 		allowedCommands = [],
 		deniedCommands = [],
 		setAllowedCommands,

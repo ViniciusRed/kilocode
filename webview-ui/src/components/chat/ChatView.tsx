@@ -1190,6 +1190,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		}
 
 		visibleMessages.forEach((message) => {
+			// kilocode_change start: upstream pr https://github.com/RooCodeInc/Roo-Code/pull/5452
 			// Special handling for browser_action_result - ensure it's always in a browser session
 			if (message.say === "browser_action_result" && !isInBrowserSession) {
 				isInBrowserSession = true
@@ -1201,6 +1202,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				isInBrowserSession = true
 				currentGroup = []
 			}
+			// kilocode_change end
 
 			if (message.ask === "browser_action_launch") {
 				// Complete existing browser session if any.
@@ -1231,6 +1233,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 
 				if (isBrowserSessionMessage(message)) {
 					currentGroup.push(message)
+
+					// kilocode_change start: upstream pr https://github.com/RooCodeInc/Roo-Code/pull/5452
 					if (message.say === "browser_action_result") {
 						// Check if the previous browser_action was a close action
 						const lastBrowserAction = [...currentGroup].reverse().find((m) => m.say === "browser_action")
@@ -1241,6 +1245,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							}
 						}
 					}
+					// kilocode_change end
 				} else {
 					// complete existing browser session if any
 					endBrowserSession()
@@ -1859,7 +1864,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							key={task.ts} // trick to make sure virtuoso re-renders when task changes, and we use initialTopMostItemIndex to start at the bottom
 							className="scrollable grow overflow-y-scroll mb-1"
 							// increasing top by 3_000 to prevent jumping around when user collapses a row
-							increaseViewportBy={{ top: 3_000, bottom: Number.MAX_SAFE_INTEGER }} // hack to make sure the last message is always rendered to get truly perfect scroll to bottom animation when new messages are added (Number.MAX_SAFE_INTEGER is safe for arithmetic operations, which is all virtuoso uses this value for in src/sizeRangeSystem.ts)
+							increaseViewportBy={{ top: 400, bottom: 400 }} // kilocode_change: use more modest numbers to see if they reduce gray screen incidence
 							data={groupedMessages} // messages is the raw format returned by extension, modifiedMessages is the manipulated structure that combines certain messages of related type, and visibleMessages is the filtered structure that removes messages that should not be rendered
 							itemContent={itemContent}
 							atBottomStateChange={(isAtBottom) => {

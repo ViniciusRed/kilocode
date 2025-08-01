@@ -380,12 +380,6 @@ export async function addCustomInstructions(
 			rules.push(genericRuleContent)
 		}
 	}
-
-	// Add generic rules
-	const genericRuleContent = await loadRuleFiles(cwd)
-	if (genericRuleContent && genericRuleContent.trim()) {
-		rules.push(genericRuleContent.trim())
-	}
 	// kilocode_change end
 
 	if (rules.length > 0) {

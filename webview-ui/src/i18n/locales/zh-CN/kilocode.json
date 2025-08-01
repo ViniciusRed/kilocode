@@ -4,7 +4,7 @@
 		"introText1": "Kilo Code 是一个免费的开源 AI 编程代理。",
 		"introText2": "它适用于最新的 AI 模型，如 Claude 4 Sonnet、Gemini 2.5 Pro、GPT-4.1 以及 450 多个其他模型。",
 		"introText3": "创建免费账户，获得价值 20 美元的 token，可用于任何 AI 模型。",
-		"ctaButton": "创建免费账户",
+		"ctaButton": "开始使用",
 		"manualModeButton": "使用你自己的 API 密钥",
 		"alreadySignedUp": "已经注册了？",
 		"loginText": "在此登录"
@@ -12,6 +12,11 @@
 	"lowCreditWarning": {
 		"addCredit": "添加额度",
 		"lowBalance": "你的 Kilo Code 余额不足"
+	},
+	"pricing": {
+		"costUnknown": "费用未知",
+		"costUnknownDescription": "API 提供商未提供任何费用数据或请求已取消。",
+		"discoverModelPricing": "了解模型定价和功能"
 	},
 	"notifications": {
 		"toolRequest": "工具请求等待批准",
@@ -44,6 +49,16 @@
 				"title": "Kilo Code - OpenRouter 提供商路由",
 				"description": "Kilo Code 将请求路由到您模型的最佳可用提供商。默认情况下，请求会在顶级提供商之间进行负载均衡，以最大限度地延长正常运行时间。但是，您可以选择要用于此模型的特定提供商。"
 			}
+		},
+		"terminal": {
+			"commandGenerator": {
+				"apiConfigId": {
+					"label": "API 配置",
+					"current": "使用当前配置",
+					"description": "选择要用于生成终端命令的 API 配置。选择\"使用当前配置\"以使用您的默认设置。"
+				},
+				"provider": "终端命令生成器提供者"
+			}
 		}
 	},
 	"chat": {
@@ -60,7 +75,14 @@
 		"dashboard": "仪表板",
 		"logOut": "退出登录",
 		"currentBalance": "当前余额",
-		"loading": "加载中..."
+		"loading": "加载中...",
+		"shop": {
+			"title": "购买 Credits",
+			"popular": "热门",
+			"credits": "Credits",
+			"action": "立即购买",
+			"viewAll": "查看所有价格选项"
+		}
 	},
 	"docs": "文档",
 	"rules": {

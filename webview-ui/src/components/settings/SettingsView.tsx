@@ -87,7 +87,6 @@ export const settingsTabTriggerActive = "opacity-100 border-vscode-focusBorder b
 export interface SettingsViewRef {
 	checkUnsaveChanges: (then: () => void) => void
 }
-
 const sectionNames = [
 	"providers",
 	"autoApprove",
@@ -105,7 +104,7 @@ const sectionNames = [
 	"about",
 ] as const
 
-type SectionName = (typeof sectionNames)[number]
+type SectionName = (typeof sectionNames)[number] // kilocode_change
 
 type SettingsViewProps = {
 	onDone: () => void
@@ -197,6 +196,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		terminalCompressProgressBar,
 		maxConcurrentFileReads,
 		allowVeryLargeReads, // kilocode_change
+		terminalCommandApiConfigId, // kilocode_change
 		condensingApiConfigId,
 		customCondensingPrompt,
 		customSupportPrompts,
@@ -373,6 +373,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 			vscode.postMessage({ type: "terminalZshP10k", bool: terminalZshP10k })
 			vscode.postMessage({ type: "terminalZdotdir", bool: terminalZdotdir })
 			vscode.postMessage({ type: "terminalCompressProgressBar", bool: terminalCompressProgressBar })
+			vscode.postMessage({ type: "terminalCommandApiConfigId", text: terminalCommandApiConfigId || "" }) // kilocode_change
 			vscode.postMessage({ type: "mcpEnabled", bool: mcpEnabled })
 			vscode.postMessage({ type: "alwaysApproveResubmit", bool: alwaysApproveResubmit })
 			vscode.postMessage({ type: "requestDelaySeconds", value: requestDelaySeconds })
@@ -498,7 +499,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 			{ id: "browser", icon: SquareMousePointer },
 			{ id: "checkpoints", icon: GitBranch },
 			{ id: "display", icon: Monitor }, // kilocode_change
-			{ id: "ghost", icon: Bot }, // kilocode_change
+			...(extensionState.experiments?.inlineAssist ? [{ id: "ghost" as const, icon: Bot }] : []), // kilocode_change
 			{ id: "notifications", icon: Bell },
 			{ id: "contextManagement", icon: Database },
 			{ id: "terminal", icon: SquareTerminal },
@@ -508,7 +509,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 			{ id: "mcp", icon: Server },
 			{ id: "about", icon: Info },
 		],
-		[], // No dependencies needed now
+		[extensionState.experiments?.inlineAssist], // kilocode_change
 	)
 
 	// Update target section logic to set active tab
@@ -516,7 +517,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		if (targetSection && sectionNames.includes(targetSection as SectionName)) {
 			setActiveTab(targetSection as SectionName)
 		}
-	}, [targetSection])
+	}, [targetSection]) // kilocode_change
 
 	// Function to scroll the active tab into view for vertical layout
 	const scrollToActiveTab = useCallback(() => {
@@ -814,6 +815,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 							terminalZshP10k={terminalZshP10k}
 							terminalZdotdir={terminalZdotdir}
 							terminalCompressProgressBar={terminalCompressProgressBar}
+							terminalCommandApiConfigId={terminalCommandApiConfigId} // kilocode_change
 							setCachedStateField={setCachedStateField}
 						/>
 					)}
@@ -828,7 +830,12 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 
 					{/* Experimental Section */}
 					{activeTab === "experimental" && (
-						<ExperimentalSettings setExperimentEnabled={setExperimentEnabled} experiments={experiments} />
+						<ExperimentalSettings
+							setExperimentEnabled={setExperimentEnabled}
+							experiments={experiments}
+							apiConfiguration={apiConfiguration /*kilocode_change*/}
+							setApiConfigurationField={setApiConfigurationField /*kilocode_change*/}
+						/>
 					)}
 
 					{/* Language Section */}

@@ -1033,10 +1033,10 @@ export const ChatRowContent = ({
 									{
 										// kilocode_change start
 										!cost && usageMissing && (
-											<StandardTooltip content="The API Provider did not provide any cost data or the request was canceled.">
+											<StandardTooltip content={t("kilocode:pricing.costUnknownDescription")}>
 												<VSCodeBadge className="whitespace-nowrap">
 													<span className="codicon codicon-warning pr-1"></span>
-													no data
+													{t("kilocode:pricing.costUnknown")}
 												</VSCodeBadge>
 											</StandardTooltip>
 										)
@@ -1186,6 +1186,7 @@ export const ChatRowContent = ({
 					const { results = [] } = parsed?.content || {}
 
 					return <CodebaseSearchResultsDisplay results={results} />
+				// kilocode_change start: upstream pr https://github.com/RooCodeInc/Roo-Code/pull/5452
 				case "browser_action_result":
 					// This should not normally be rendered here as browser_action_result messages
 					// should be grouped into browser sessions and rendered by BrowserSessionRow.
@@ -1217,6 +1218,7 @@ export const ChatRowContent = ({
 							</div>
 						</>
 					)
+				// kilocode_change end
 				case "user_edit_todos":
 					return <UpdateTodoListToolBlock userEdited onChange={() => {}} />
 				default:

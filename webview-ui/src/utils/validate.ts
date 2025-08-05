@@ -109,7 +109,7 @@ function validateModelsAndKeysProvided(apiConfiguration: ProviderSettings): stri
 			break
 		case "fireworks":
 			if (!apiConfiguration.fireworksApiKey) {
-				return "You must provide a valid API key or choose a different provider."
+				return i18next.t("settings:validation.apiKey")
 			}
 			break
 		// kilocode_change start

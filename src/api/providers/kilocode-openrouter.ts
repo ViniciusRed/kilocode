@@ -1,5 +1,5 @@
 import { ApiHandlerOptions, ModelRecord } from "../../shared/api"
-import { OpenRouterHandler } from "./openrouter"
+import { CompletionUsage, OpenRouterHandler } from "./openrouter"
 import { getModelParams } from "../transform/model-params"
 import { getModels } from "./fetchers/modelCache"
 import { DEEP_SEEK_DEFAULT_TEMPERATURE, kilocodeDefaultModelId } from "@roo-code/types"
@@ -34,6 +34,14 @@ export class KilocodeOpenrouterHandler extends OpenRouterHandler {
 					},
 				}
 			: undefined
+	}
+
+	override getTotalCost(lastUsage: CompletionUsage): number {
+		// https://github.com/Kilo-Org/kilocode-backend/blob/eb3d382df1e933a089eea95b9c4387db0c676e35/src/lib/processUsage.ts#L281
+		if (lastUsage.is_byok) {
+			return lastUsage.cost_details?.upstream_inference_cost || 0
+		}
+		return lastUsage.cost || 0
 	}
 
 	override getModel() {

@@ -10,53 +10,6 @@ import {
 export type ApiHandlerOptions = Omit<ProviderSettings, "apiProvider">
 
 // kilocode_change start
-// Fireworks
-// https://fireworks.ai/models
-// TODO: Add support for all Fireworks models, currently only supports DeepSeek's serverless models
-
-export const fireworksModels = {
-	"accounts/fireworks/models/deepseek-r1": {
-		maxTokens: 16384,
-		contextWindow: 160000,
-		supportsImages: false,
-		supportsPromptCache: true,
-		inputPrice: 3.0,
-		outputPrice: 8.0,
-	},
-
-	"accounts/fireworks/models/deepseek-v3": {
-		maxTokens: 16384,
-		contextWindow: 128_000,
-		supportsImages: false,
-		supportsPromptCache: true,
-		inputPrice: 0.9,
-		outputPrice: 0.9,
-	},
-
-	"accounts/fireworks/models/llama4-scout-instruct-basic": {
-		maxTokens: 16_384,
-		contextWindow: 128_000,
-		supportsImages: true,
-		supportsPromptCache: true,
-		inputPrice: 0.15,
-		outputPrice: 0.6,
-	},
-
-	"accounts/fireworks/models/llama4-maverick-instruct-basic": {
-		maxTokens: 16_384,
-		contextWindow: 1_000_000,
-		supportsImages: true,
-		supportsPromptCache: true,
-		inputPrice: 0.22,
-		outputPrice: 0.88,
-	},
-} as const satisfies Record<string, ModelInfo>
-
-export type FireworksModelId = keyof typeof fireworksModels
-export const fireworksDefaultModelId: FireworksModelId = "accounts/fireworks/models/llama4-maverick-instruct-basic"
-// kilocode_change end
-
-// kilocode_change start
 // Cerebras
 // https://inference-docs.cerebras.ai/api-reference/models
 

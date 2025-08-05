@@ -38,6 +38,7 @@
 			"apiKey": "Kilo Code API Anahtarı",
 			"login": "Kilo Code'a giriş yap",
 			"logout": "Kilo Code'dan çıkış yap",
+			"automaticFetch": "En son modeller Kilo Code'da otomatik olarak kullanılabilir. Hangi modeli seçeceğinizden emin değilseniz, Kilo Code en üstte <strong>kalın yazı</strong> ile listelenen önerilen modellerle en iyi şekilde çalışır.",
 			"providerRouting": {
 				"title": "Kilo Code - OpenRouter Sağlayıcı Yönlendirme",
 				"description": "Kilo Code, modeliniz için en iyi kullanılabilir sağlayıcılara istekleri yönlendirir. Varsayılan olarak, çalışma süresini en üst düzeye çıkarmak için istekler en iyi sağlayıcılar arasında yük dengelenir. Ancak, bu model için kullanılacak belirli bir sağlayıcı seçebilirsiniz."
@@ -160,6 +161,7 @@
 	"ghost": {
 		"title": "Satır İçi Yardım",
 		"settings": {
+			"autoTrigger": "Otomatik Tetikleyici",
 			"enableQuickInlineTaskKeybinding": {
 				"label": "Hızlı Satır İçi Görev",
 				"description": "Sadece hızlı bir değişikliğe mi ihtiyacınız var? Biraz kod seçin (ya da seçmeyin!) ve Cmd+I tuşuna basın. Amacınızı sade bir şekilde açıklayın (\"bu prop'larla bir React bileşeni oluştur\", \"bu fonksiyona hata yönetimi ekle\") ve düzenleyicinizde kullanıma hazır birden fazla öneri alın. <DocsLink>Kısayolu gör</DocsLink>"
@@ -167,6 +169,18 @@
 			"enableAutoInlineTaskKeybinding": {
 				"label": "Otomatik Satır İçi Görev",
 				"description": "Hızlı bir düzeltme, tamamlama veya yeniden düzenleme mi gerekiyor? Kilo, çevreleyen bağlamı kullanarak anında iyileştirmeler sunacak, böylece odağınızı kaybetmeyeceksiniz. <DocsLink>Kısayolu gör</DocsLink>"
+			},
+			"enableAutoTrigger": {
+				"label": "Otomatik Tetikleyiciyi Etkinleştir",
+				"description": "Etkinleştirildiğinde, yazmayı bıraktığında Kilo Code otomatik olarak Satır İçi Yardımı tetikler. Bu, hızlı düzeltmeler ve öneriler için yararlı olabilir."
+			},
+			"autoTriggerDelay": {
+				"label": "Otomatik Tetikleyici Gecikmesi",
+				"description": "Yazmayı bıraktıktan sonra Kilo Code'un Satır İçi Yardımı tetiklemeden önceki saniye cinsinden gecikme. Daha kısa gecikme daha hızlı öneriler anlamına gelir, ancak daha fazla kaynak kullanabilir."
+			},
+			"enableSmartInlineTaskKeybinding": {
+				"label": "Akıllı Satır İçi Görev",
+				"description": "Hızlı bir düzeltme, tamamlama veya yeniden düzenlemeye mi ihtiyacın var? Kilo, anında iyileştirmeler sunmak için çevredeki bağlamı kullanır ve seni akışta tutar. <DocsLink>Kısayolu gör</DocsLink>"
 			},
 			"provider": "Sağlayıcı",
 			"apiConfigId": {

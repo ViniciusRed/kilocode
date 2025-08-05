@@ -12,13 +12,18 @@ import {
 	openAiNativeModels,
 	vertexModels,
 	xaiModels,
+	// kilocode_change start
+	zaiModels,
+	bigModelModels,
+	// kilocode_change end
 	groqModels,
 	chutesModels,
 	sambaNovaModels,
 	doubaoModels,
+	fireworksModels,
 } from "@roo-code/types"
 
-import { fireworksModels, cerebrasModels } from "@roo/api" // kilocode_change
+import { cerebrasModels } from "@roo/api" // kilocode_change
 
 export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, ModelInfo>>> = {
 	anthropic: anthropicModels,
@@ -28,27 +33,37 @@ export const MODELS_BY_PROVIDER: Partial<Record<ProviderName, Record<string, Mod
 	doubao: doubaoModels,
 	moonshot: moonshotModels,
 	gemini: geminiModels,
-	"gemini-cli": geminiCliModels, // kilocode_change
-	fireworks: fireworksModels, // kilocode_change
+	// kilocode_change start
+	"gemini-cli": geminiCliModels,
+	zai: zaiModels,
+	bigmodel: bigModelModels,
+	cerebras: cerebrasModels,
+	// kilocode_change end
 	mistral: mistralModels,
 	"openai-native": openAiNativeModels,
 	vertex: vertexModels,
 	xai: xaiModels,
 	groq: groqModels,
 	chutes: chutesModels,
-	cerebras: cerebrasModels, // kilocode_change
 	sambanova: sambaNovaModels,
+	fireworks: fireworksModels,
 }
 
 export const PROVIDERS = [
 	{ value: "kilocode", label: "Kilo Code" },
 	{ value: "openrouter", label: "OpenRouter" },
 	{ value: "anthropic", label: "Anthropic" },
-	{ value: "fireworks", label: "Fireworks" }, // kilocode_change
 	{ value: "claude-code", label: "Claude Code" },
 	{ value: "gemini", label: "Google Gemini" },
 	{ value: "gemini-cli", label: "Gemini CLI" },
 	{ value: "doubao", label: "Doubao" },
+	{ value: "fireworks", label: "Fireworks AI" },
+	// kilocode_change start
+	{ value: "zai", label: "Z.AI" },
+	{ value: "bigmodel", label: "BigModel" },
+	{ value: "cerebras", label: "Cerebras" },
+	{ value: "virtual-quota-fallback", label: "Virtual Quota Fallback" },
+	// kilocode_change end
 	{ value: "deepseek", label: "DeepSeek" },
 	{ value: "moonshot", label: "Moonshot" },
 	{ value: "openai-native", label: "OpenAI" },
@@ -67,8 +82,6 @@ export const PROVIDERS = [
 	{ value: "groq", label: "Groq" },
 	{ value: "huggingface", label: "Hugging Face" },
 	{ value: "chutes", label: "Chutes AI" },
-	{ value: "cerebras", label: "Cerebras" }, // kilocode_change
-	{ value: "virtual-quota-fallback", label: "Virtual Quota Fallback" }, // kilocode_change
 	{ value: "litellm", label: "LiteLLM" },
 	{ value: "sambanova", label: "SambaNova" },
 ] // .sort((a, b) => a.label.localeCompare(b.label)) // kilocode_change: Sort providers with kilocode first

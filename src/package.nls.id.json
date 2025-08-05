@@ -3,7 +3,7 @@
 	"extension.description": "Asisten coding AI Open Source untuk merencanakan, membangun, dan memperbaiki kode.",
 	"views.contextMenu.label": "Kilo Code",
 	"views.terminalMenu.label": "Kilo Code",
-	"views.activitybar.title": "Kilo Code (⇧⌘A)",
+	"views.activitybar.title": "Kilo Code",
 	"views.sidebar.name": "Kilo Code",
 	"command.newTask.title": "Tugas Baru",
 	"command.mcpServers.title": "Server MCP",

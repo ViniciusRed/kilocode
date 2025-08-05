@@ -237,14 +237,23 @@ export const ModelPicker = ({
 				/>
 			)}
 			<div className="text-sm text-vscode-descriptionForeground">
-				<Trans
-					i18nKey="settings:modelPicker.automaticFetch"
-					components={{
-						serviceLink: <VSCodeLink href={serviceUrl} className="text-sm" />,
-						defaultModelLink: <VSCodeLink onClick={() => onSelect(defaultModelId)} className="text-sm" />,
-					}}
-					values={{ serviceName, defaultModelId }}
-				/>
+				{
+					/*kilocode_change start*/
+					apiConfiguration.apiProvider === "kilocode" ? (
+						<Trans i18nKey="kilocode:settings.provider.automaticFetch" />
+					) : (
+						<Trans
+							i18nKey="settings:modelPicker.automaticFetch"
+							components={{
+								serviceLink: <VSCodeLink href={serviceUrl} className="text-sm" />,
+								defaultModelLink: (
+									<VSCodeLink onClick={() => onSelect(defaultModelId)} className="text-sm" />
+								),
+							}}
+							values={{ serviceName, defaultModelId }}
+						/>
+					) /*kilocode_change end*/
+				}
 			</div>
 		</>
 	)

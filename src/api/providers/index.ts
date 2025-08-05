@@ -25,6 +25,11 @@ export { RequestyHandler } from "./requesty"
 export { SambaNovaHandler } from "./sambanova"
 export { UnboundHandler } from "./unbound"
 export { VertexHandler } from "./vertex"
-export { VirtualQuotaFallbackHandler } from "./virtual-quota-fallback" // kilocode_change
+// kilocode_change start
+export { VirtualQuotaFallbackHandler } from "./virtual-quota-fallback"
+export { ZAIHandler } from "./zai"
+export { BigModelHandler } from "./bigmodel"
+// kilocode_change end
 export { VsCodeLmHandler } from "./vscode-lm"
 export { XAIHandler } from "./xai"
+export { FireworksHandler } from "./fireworks"

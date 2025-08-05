@@ -26,6 +26,8 @@ import {
 	HumanRelayHandler,
 	FakeAIHandler,
 	XAIHandler,
+	ZAIHandler, // kilocode_change
+	BigModelHandler, // kilocode_change
 	GroqHandler,
 	HuggingFaceHandler,
 	ChutesHandler,
@@ -35,9 +37,9 @@ import {
 	ClaudeCodeHandler,
 	SambaNovaHandler,
 	DoubaoHandler,
+	FireworksHandler,
 } from "./providers"
 // kilocode_change start
-import { FireworksHandler } from "./providers/fireworks"
 import { KilocodeOpenrouterHandler } from "./providers/kilocode-openrouter"
 import { KilocodeOllamaHandler } from "./providers/kilocode-ollama"
 // kilocode_change end
@@ -126,6 +128,10 @@ export function buildApiHandler(configuration: ProviderSettings): ApiHandler {
 			return new FireworksHandler(options)
 		case "virtual-quota-fallback":
 			return new VirtualQuotaFallbackHandler(options)
+		case "zai":
+			return new ZAIHandler(options)
+		case "bigmodel":
+			return new BigModelHandler(options)
 		// kilocode_change end
 		case "fake-ai":
 			return new FakeAIHandler(options)

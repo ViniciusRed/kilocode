@@ -32,6 +32,7 @@
 			"apiKey": "Chiave API Kilo Code",
 			"login": "Accedi a Kilo Code",
 			"logout": "Disconnetti da Kilo Code",
+			"automaticFetch": "I modelli più recenti sono automaticamente disponibili in Kilo Code. Se non sei sicuro di quale modello scegliere, Kilo Code funziona meglio con i modelli consigliati elencati in alto in <strong>grassetto</strong>.",
 			"providerRouting": {
 				"title": "Kilo Code - Routing dei provider OpenRouter",
 				"description": "Kilo Code instrada le richieste ai migliori provider disponibili per il tuo modello. Per impostazione predefinita, le richieste vengono bilanciate tra i provider principali per massimizzare i tempi di attività. Tuttavia, puoi scegliere un provider specifico da utilizzare per questo modello."
@@ -160,6 +161,7 @@
 	"ghost": {
 		"title": "Assistenza in linea",
 		"settings": {
+			"autoTrigger": "Attivazione automatica",
 			"enableQuickInlineTaskKeybinding": {
 				"label": "Attività Rapida In Linea",
 				"description": "Hai solo bisogno di una modifica rapida? Seleziona del codice (o anche no!) e premi Cmd+I. Descrivi il tuo obiettivo in linguaggio semplice (\"crea un componente React con queste props\", \"aggiungi la gestione degli errori a questa funzione\") e ottieni molteplici suggerimenti pronti all'uso direttamente nel tuo editor. <DocsLink>Vedi scorciatoia</DocsLink>"
@@ -167,6 +169,18 @@
 			"enableAutoInlineTaskKeybinding": {
 				"label": "Attività Automatica in Linea",
 				"description": "Hai bisogno di una correzione rapida, di completare o refactoring del codice? Kilo userà il contesto circostante per offrire miglioramenti immediati, mantenendoti concentrato. <DocsLink>Vedi scorciatoia</DocsLink>"
+			},
+			"enableAutoTrigger": {
+				"label": "Abilita attivazione automatica",
+				"description": "Quando abilitato, Kilo Code attiverà automaticamente l'Assistenza Inline quando smetti di digitare. Questo può essere utile per correzioni e suggerimenti rapidi."
+			},
+			"autoTriggerDelay": {
+				"label": "Ritardo attivazione automatica",
+				"description": "Il ritardo in secondi prima che Kilo Code attivi l'Assistenza Inline dopo che hai smesso di digitare. Un ritardo più breve significa suggerimenti più rapidi, ma potrebbe essere più intensivo in termini di risorse."
+			},
+			"enableSmartInlineTaskKeybinding": {
+				"label": "Attività Inline Intelligente",
+				"description": "Hai bisogno di una correzione rapida, completamento o refactoring? Kilo userà il contesto circostante per offrire miglioramenti immediati, mantenendoti nel flusso. <DocsLink>Vedi scorciatoia</DocsLink>"
 			},
 			"provider": "Fornitore",
 			"apiConfigId": {

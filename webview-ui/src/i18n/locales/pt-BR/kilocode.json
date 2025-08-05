@@ -32,6 +32,7 @@
 			"apiKey": "Chave de API do Kilo Code",
 			"login": "Entrar no Kilo Code",
 			"logout": "Sair do Kilo Code",
+			"automaticFetch": "Os modelos mais recentes estão automaticamente disponíveis no Kilo Code. Se você não tem certeza de qual modelo escolher, o Kilo Code funciona melhor com os modelos recomendados listados no topo em <strong>negrito</strong>.",
 			"providerRouting": {
 				"title": "Kilo Code - Roteamento de Provedor OpenRouter",
 				"description": "O Kilo Code roteia as solicitações para os melhores provedores disponíveis para o seu modelo. Por padrão, as solicitações são balanceadas em carga entre os principais provedores para maximizar o tempo de atividade. No entanto, você pode escolher um provedor específico para usar para este modelo."
@@ -160,6 +161,7 @@
 	"ghost": {
 		"title": "Assistência em linha",
 		"settings": {
+			"autoTrigger": "Gatilho Automático",
 			"enableQuickInlineTaskKeybinding": {
 				"label": "Tarefa Rápida em Linha",
 				"description": "Precisa apenas de uma mudança rápida? Selecione algum código (ou não!) e pressione Cmd+I. Descreva seu objetivo em linguagem simples (\"criar um componente React com essas props\", \"adicionar tratamento de erro a esta função\") e receba múltiplas sugestões prontas para uso diretamente no seu editor. <DocsLink>Ver atalho</DocsLink>"
@@ -167,6 +169,18 @@
 			"enableAutoInlineTaskKeybinding": {
 				"label": "Tarefa Automática em Linha",
 				"description": "Precisa de uma correção rápida, preenchimento ou refatoração? Kilo usará o contexto ao redor para oferecer melhorias imediatas, mantendo seu fluxo de trabalho. <DocsLink>Ver atalho</DocsLink>"
+			},
+			"enableAutoTrigger": {
+				"label": "Ativar Gatilho Automático",
+				"description": "Quando ativado, o Kilo Code acionará automaticamente a Assistência em Linha quando você parar de digitar. Isso pode ser útil para correções e sugestões rápidas."
+			},
+			"autoTriggerDelay": {
+				"label": "Atraso do Gatilho Automático",
+				"description": "O atraso em segundos antes do Kilo Code acionar a Assistência em Linha após você parar de digitar. Um atraso menor significa sugestões mais rápidas, mas pode ser mais intensivo em recursos."
+			},
+			"enableSmartInlineTaskKeybinding": {
+				"label": "Tarefa Inteligente em Linha",
+				"description": "Precisa de uma correção rápida, completar ou refatorar? O Kilo usará o contexto ao redor para oferecer melhorias imediatas, mantendo você no fluxo. <DocsLink>Ver atalho</DocsLink>"
 			},
 			"provider": "Provedor",
 			"apiConfigId": {

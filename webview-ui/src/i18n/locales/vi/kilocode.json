@@ -41,7 +41,8 @@
 			"providerRouting": {
 				"title": "Kilo Code - Định tuyến nhà cung cấp OpenRouter",
 				"description": "Kilo Code định tuyến các yêu cầu đến các nhà cung cấp tốt nhất có sẵn cho mô hình của bạn. Theo mặc định, các yêu cầu được cân bằng tải trên các nhà cung cấp hàng đầu để tối đa hóa thời gian hoạt động. Tuy nhiên, bạn có thể chọn một nhà cung cấp cụ thể để sử dụng cho mô hình này."
-			}
+			},
+			"automaticFetch": "Các mô hình mới nhất được tự động cung cấp trong Kilo Code. Nếu bạn không chắc chắn nên chọn mô hình nào, Kilo Code hoạt động tốt nhất với các mô hình được khuyến nghị được liệt kê ở đầu bằng <strong>chữ đậm</strong>."
 		},
 		"systemNotifications": {
 			"label": "Bật thông báo hệ thống",
@@ -160,12 +161,21 @@
 	"ghost": {
 		"title": "Hỗ trợ nội tuyến",
 		"settings": {
+			"autoTrigger": "Kích hoạt tự động",
 			"enableQuickInlineTaskKeybinding": {
 				"label": "Nhiệm vụ nhanh trong dòng",
 				"description": "Chỉ cần thay đổi nhanh? Chọn một đoạn code (hoặc không cần!) và nhấn Cmd+I. Mô tả mục tiêu của bạn bằng ngôn ngữ đơn giản (\"tạo một component React với các props này\", \"thêm xử lý lỗi vào hàm này\"), và nhận nhiều gợi ý sẵn sàng sử dụng ngay trong trình soạn thảo của bạn. <DocsLink>Xem phím tắt</DocsLink>"
 			},
-			"enableAutoInlineTaskKeybinding": {
-				"label": "Tác vụ tự động nội tuyến",
+			"enableAutoTrigger": {
+				"label": "Bật kích hoạt tự động",
+				"description": "Khi được bật, Kilo Code sẽ tự động kích hoạt Trợ lý nội tuyến khi bạn ngừng gõ. Điều này có thể hữu ích cho các sửa lỗi và gợi ý nhanh."
+			},
+			"autoTriggerDelay": {
+				"label": "Độ trễ kích hoạt tự động",
+				"description": "Độ trễ tính bằng giây trước khi Kilo Code kích hoạt Trợ lý nội tuyến sau khi bạn ngừng gõ. Độ trễ thấp hơn có nghĩa là gợi ý nhanh hơn nhưng có thể tốn nhiều tài nguyên hơn."
+			},
+			"enableSmartInlineTaskKeybinding": {
+				"label": "Tác vụ thông minh nội tuyến",
 				"description": "Cần sửa nhanh, hoàn thiện hay cấu trúc lại code? Kilo sẽ sử dụng ngữ cảnh xung quanh để đưa ra các cải tiến ngay lập tức, giúp bạn duy trì nhịp độ làm việc. <DocsLink>Xem phím tắt</DocsLink>"
 			},
 			"provider": "Nhà cung cấp",

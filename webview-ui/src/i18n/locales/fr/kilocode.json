@@ -32,6 +32,7 @@
 			"apiKey": "Clé API Kilo Code",
 			"login": "Se connecter à Kilo Code",
 			"logout": "Se déconnecter de Kilo Code",
+			"automaticFetch": "Les derniers modèles sont automatiquement disponibles dans Kilo Code. Si vous ne savez pas quel modèle choisir, Kilo Code fonctionne mieux avec les modèles recommandés listés en haut en <strong>gras</strong>.",
 			"providerRouting": {
 				"title": "Kilo Code - Routage des fournisseurs OpenRouter",
 				"description": "Kilo Code achemine les demandes vers les meilleurs fournisseurs disponibles pour votre modèle. Par défaut, les demandes sont réparties entre les principaux fournisseurs afin de maximiser le temps de disponibilité. Cependant, vous pouvez choisir un fournisseur spécifique à utiliser pour ce modèle."
@@ -160,6 +161,7 @@
 	"ghost": {
 		"title": "Assistance en ligne",
 		"settings": {
+			"autoTrigger": "Déclenchement automatique",
 			"enableQuickInlineTaskKeybinding": {
 				"label": "Tâche Rapide en Ligne",
 				"description": "Besoin d'une modification rapide ? Sélectionnez du code (ou pas !) et appuyez sur Cmd+I. Décrivez votre objectif en langage courant (\"créer un composant React avec ces props\", \"ajouter une gestion d'erreurs à cette fonction\"), et obtenez plusieurs suggestions prêtes à l'emploi directement dans votre éditeur. <DocsLink>Voir le raccourci</DocsLink>"
@@ -167,6 +169,18 @@
 			"enableAutoInlineTaskKeybinding": {
 				"label": "Tâche automatique en ligne",
 				"description": "Besoin d'une correction rapide, d'une complétion ou d'une refactorisation ? Kilo utilisera le contexte environnant pour proposer des améliorations immédiates, vous permettant de rester dans votre flux de travail. <DocsLink>Voir le raccourci</DocsLink>"
+			},
+			"enableAutoTrigger": {
+				"label": "Activer le déclenchement automatique",
+				"description": "Lorsqu'activé, Kilo Code déclenchera automatiquement l'Assistance en ligne quand tu arrêtes de taper. Cela peut être utile pour des corrections et suggestions rapides."
+			},
+			"autoTriggerDelay": {
+				"label": "Délai du déclenchement automatique",
+				"description": "Le délai en secondes avant que Kilo Code déclenche l'Assistance en ligne après que tu aies arrêté de taper. Un délai plus court signifie des suggestions plus rapides, mais peut être plus gourmand en ressources."
+			},
+			"enableSmartInlineTaskKeybinding": {
+				"label": "Tâche Intelligente en Ligne",
+				"description": "Besoin d'une correction rapide, d'une complétion ou d'un refactoring ? Kilo utilisera le contexte environnant pour offrir des améliorations immédiates, te gardant dans le flux. <DocsLink>Voir le raccourci</DocsLink>"
 			},
 			"provider": "Fournisseur",
 			"apiConfigId": {

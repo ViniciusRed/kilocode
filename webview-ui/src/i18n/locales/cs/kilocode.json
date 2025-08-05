@@ -32,6 +32,7 @@
 			"apiKey": "Kilo Code API Key",
 			"login": "Přihlásit se do Kilo Code",
 			"logout": "Odhlásit se z Kilo Code",
+			"automaticFetch": "Nejnovější modely jsou v Kilo Code automaticky dostupné. Pokud si nejste jisti, který model zvolit, Kilo Code funguje nejlépe s doporučenými modely uvedenými nahoře <strong>tučně</strong>.",
 			"providerRouting": {
 				"title": "Kilo Code - Směrování poskytovatelů OpenRouter",
 				"description": "Kilo Code směruje požadavky na nejlepší dostupné poskytovatele pro váš model. Ve výchozím nastavení jsou požadavky rozloženy mezi nejlepší poskytovatele, aby se maximalizovala doba provozu. Můžete si však vybrat konkrétního poskytovatele, kterého chcete pro tento model použít."
@@ -160,6 +161,7 @@
 	"ghost": {
 		"title": "Inline asistence",
 		"settings": {
+			"autoTrigger": "Automatické spuštění",
 			"enableQuickInlineTaskKeybinding": {
 				"label": "Rychlý inline úkol",
 				"description": "Potřebujete jen rychlou změnu? Vyberte nějaký kód (nebo ne!) a stiskněte Cmd+I. Popište svůj cíl běžnou češtinou (\"vytvořit React komponentu s těmito props\", \"přidat ošetření chyb do této funkce\") a získejte několik připravených návrhů přímo ve svém editoru. <DocsLink>Zobrazit zkratku</DocsLink>"
@@ -167,6 +169,18 @@
 			"enableAutoInlineTaskKeybinding": {
 				"label": "Automatický inline úkol",
 				"description": "Potřebujete rychlou opravu, doplnění nebo refaktoring? Kilo využije okolní kontext a nabídne okamžitá vylepšení, abyste neztratili tempo. <DocsLink>Zobrazit klávesovou zkratku</DocsLink>"
+			},
+			"enableAutoTrigger": {
+				"label": "Povolit automatické spuštění",
+				"description": "Když je povoleno, Kilo Code automaticky spustí Inline Assist, když přestaneš psát. To může být užitečné pro rychlé opravy a návrhy."
+			},
+			"autoTriggerDelay": {
+				"label": "Zpoždění automatického spuštění",
+				"description": "Zpoždění v sekundách před tím, než Kilo Code spustí Inline Assist poté, co přestaneš psát. Kratší zpoždění znamená rychlejší návrhy, ale může být náročnější na zdroje."
+			},
+			"enableSmartInlineTaskKeybinding": {
+				"label": "Chytrý inline úkol",
+				"description": "Potřebuješ rychlou opravu, dokončení nebo refaktoring? Kilo použije okolní kontext k nabídnutí okamžitých vylepšení, což tě udrží v pracovním tempu. <DocsLink>Zobrazit zkratku</DocsLink>"
 			},
 			"provider": "Poskytovatel",
 			"apiConfigId": {

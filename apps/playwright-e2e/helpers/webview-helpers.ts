@@ -98,3 +98,16 @@ export async function closeAllTabs(page: Page): Promise<void> {
 		await expect(dismissedTabs).not.toBeVisible()
 	}
 }
+
+export async function waitForAllExtensionActivation(page: Page): Promise<void> {
+	try {
+		const activatingStatus = page.locator("text=Activating Extensions")
+		const activatingStatusCount = await activatingStatus.count()
+		if (activatingStatusCount > 0) {
+			console.log("⌛️ Waiting for `Activating Extensions` to go away...")
+			await activatingStatus.waitFor({ state: "hidden", timeout: 10000 })
+		}
+	} catch {
+		// noop
+	}
+}

@@ -198,12 +198,17 @@ export const SECRET_STATE_KEYS = [
 	"litellmApiKey",
 	"codeIndexOpenAiKey",
 	"codeIndexQdrantApiKey",
-	"kilocodeToken", // kilocode_change
+	// kilocode_change start
+	"kilocodeToken",
+	"zaiApiKey",
+	"bigModelApiKey",
+	// kilocode_change end
 	"codebaseIndexOpenAiCompatibleApiKey",
 	"codebaseIndexGeminiApiKey",
 	"codebaseIndexMistralApiKey",
 	"huggingFaceApiKey",
 	"sambaNovaApiKey",
+	"fireworksApiKey",
 ] as const satisfies readonly (keyof ProviderSettings)[]
 export type SecretState = Pick<ProviderSettings, (typeof SECRET_STATE_KEYS)[number]>
 

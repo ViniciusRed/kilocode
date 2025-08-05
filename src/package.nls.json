@@ -3,7 +3,7 @@
 	"extension.description": "Open Source AI coding assistant for planning, building, and fixing code.",
 	"views.contextMenu.label": "Kilo Code",
 	"views.terminalMenu.label": "Kilo Code",
-	"views.activitybar.title": "Kilo Code (⇧⌘A)",
+	"views.activitybar.title": "Kilo Code",
 	"views.sidebar.name": "Kilo Code",
 	"command.newTask.title": "New Task",
 	"command.mcpServers.title": "MCP Servers",

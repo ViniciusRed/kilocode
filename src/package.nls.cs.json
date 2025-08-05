@@ -3,7 +3,7 @@
 	"extension.description": "Open Source AI asistent pro kódování pro plánování, vytváření a opravy kódu.",
 	"views.contextMenu.label": "Kilo Code",
 	"views.terminalMenu.label": "Kilo Code",
-	"views.activitybar.title": "Kilo Code (⇧⌘A)",
+	"views.activitybar.title": "Kilo Code",
 	"views.sidebar.name": "Kilo Code",
 	"command.newTask.title": "Nový úkol",
 	"command.mcpServers.title": "MCP servery",

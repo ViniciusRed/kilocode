@@ -29,7 +29,6 @@ export const ModelInfoView = ({
 	const kiloCodeTrustsThePricing =
 		(apiProvider !== "kilocode" && apiProvider !== "openrouter") ||
 		selectedModelId.startsWith("anthropic/") ||
-		selectedModelId.startsWith("openai/") ||
 		selectedModelId.startsWith("google/")
 	// kilocode_change end
 

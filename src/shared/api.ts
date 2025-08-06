@@ -13,67 +13,103 @@ export type ApiHandlerOptions = Omit<ProviderSettings, "apiProvider">
 // Cerebras
 // https://inference-docs.cerebras.ai/api-reference/models
 
-// Cerebras AI Inference Model Definitions - Updated July 2025
+// Cerebras AI Inference Model Definitions - Updated August 2025
 
 export const cerebrasModels = {
-	"qwen-3-coder-480b-free": {
-		maxTokens: 40000,
-		contextWindow: 64000,
+	"gpt-oss-120b": {
+		maxTokens: 65536,
+		contextWindow: 65536,
 		supportsImages: false,
 		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
-		description: "SOTA coding model with ~2000 tokens/s (free tier)",
+		inputPrice: 0.25,
+		outputPrice: 0.69,
+		description: "OpenAI's GPT-OSS model with ~3000 tokens/s",
 	},
-	"qwen-3-coder-480b": {
-		maxTokens: 40000,
-		contextWindow: 128000,
+	"llama-4-scout-17b-16e-instruct": {
+		maxTokens: 8192,
+		contextWindow: 8192,
 		supportsImages: false,
 		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
-		description: "SOTA coding model with ~2000 tokens/s",
+		inputPrice: 0.65,
+		outputPrice: 0.85,
+		description: "Llama 4 Scout with ~2600 tokens/s",
 	},
-	"qwen-3-235b-a22b-instruct-2507": {
-		maxTokens: 20000,
-		contextWindow: 20000,
+	"llama-4-maverick-17b-128e-instruct": {
+		maxTokens: 8192,
+		contextWindow: 8192,
 		supportsImages: false,
 		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
-		description: "Intelligent model with ~1400 tokens/s",
+		inputPrice: 0.20,
+		outputPrice: 0.60,
+		description: "Llama 4 Maverick with ~1500 tokens/s",
+	},
+	"llama3.1-8b": {
+		maxTokens: 8192,
+		contextWindow: 8192,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.10,
+		outputPrice: 0.10,
+		description: "Fast and efficient model with ~2200 tokens/s",
 	},
 	"llama-3.3-70b": {
-		maxTokens: 64000,
-		contextWindow: 64000,
+		maxTokens: 65536,
+		contextWindow: 65536,
 		supportsImages: false,
 		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
-		description: "Powerful model with ~2600 tokens/s",
+		inputPrice: 0.85,
+		outputPrice: 1.20,
+		description: "Powerful model with ~2100 tokens/s",
 	},
 	"qwen-3-32b": {
+		maxTokens: 65536,
+		contextWindow: 65536,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.40,
+		outputPrice: 0.80,
+		description: "SOTA coding performance with ~2600 tokens/s",
+	},
+	"qwen-3-235b-a22b-instruct-2507": {
 		maxTokens: 64000,
 		contextWindow: 64000,
 		supportsImages: false,
 		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
-		description: "SOTA coding performance with ~2500 tokens/s",
+		inputPrice: 0.60,
+		outputPrice: 1.20,
+		description: "Intelligent model with ~1400 tokens/s",
 	},
 	"qwen-3-235b-a22b-thinking-2507": {
-		maxTokens: 32000,
-		contextWindow: 65000,
+		maxTokens: 65536,
+		contextWindow: 65536,
 		supportsImages: false,
 		supportsPromptCache: false,
-		inputPrice: 0,
-		outputPrice: 0,
-		description: "SOTA performance with ~1500 tokens/s",
+		inputPrice: 0.60,
+		outputPrice: 1.20,
+		description: "SOTA performance with ~1700 tokens/s",
+	},
+	"qwen-3-coder-480b": {
+		maxTokens: 65536,
+		contextWindow: 65536,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 2.00,
+		outputPrice: 2.00,
+		description: "SOTA coding model with ~2000 tokens/s",
+	},
+	"deepseek-r1-distill-llama-70b": {
+		maxTokens: 65536,
+		contextWindow: 65536,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 2.20,
+		outputPrice: 2.50,
+		description: "Deepseek R1 Distill with ~2600 tokens/s",
 	},
 } as const satisfies Record<string, ModelInfo>
 
 export type CerebrasModelId = keyof typeof cerebrasModels
-export const cerebrasDefaultModelId: CerebrasModelId = "qwen-3-coder-480b-free"
+export const cerebrasDefaultModelId: CerebrasModelId = "gpt-oss-120b"
 
 // kilocode_change end
 

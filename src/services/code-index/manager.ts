@@ -380,12 +380,21 @@ export class CodeIndexManager {
 
 			// If feature is disabled, stop the service
 			if (!isFeatureEnabled) {
-				// Stop the orchestrator if it exists
+				// Stop the orchestrator if it exists and is processing
 				if (this._orchestrator) {
+					// Check if currently indexing to show appropriate message
+					const wasIndexing = this._orchestrator.state === "Indexing" || this._orchestrator.isProcessing
 					this._orchestrator.stopWatcher()
+
+					// Set appropriate message based on previous state
+					if (wasIndexing) {
+						this._stateManager.setSystemState("Standby", "Indexing cancelled by disabled")
+					} else {
+						this._stateManager.setSystemState("Standby", "Code indexing is disabled")
+					}
+				} else {
+					this._stateManager.setSystemState("Standby", "Code indexing is disabled")
 				}
-				// Set state to indicate service is disabled
-				this._stateManager.setSystemState("Standby", "Code indexing is disabled")
 				return
 			}
 

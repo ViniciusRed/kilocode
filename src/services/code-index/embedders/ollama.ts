@@ -7,18 +7,27 @@ import { withValidationErrorHandling, sanitizeErrorMessage } from "../shared/val
 import { TelemetryService } from "@roo-code/telemetry"
 import { TelemetryEventName } from "@roo-code/types"
 
-// Timeout constants for Ollama API requests
-const OLLAMA_EMBEDDING_TIMEOUT_MS = 60000 // 60 seconds for embedding requests
-const OLLAMA_VALIDATION_TIMEOUT_MS = 30000 // 30 seconds for validation requests
+// Adaptive timeout constants
+const BASE_TIMEOUT_MS = 30000 // 30 seconds base timeout
+const TIMEOUT_PER_TEXT_MS = 2000 // 2 seconds per text item
+const MAX_TIMEOUT_MS = 300000 // 5 minutes maximum timeout
+const MIN_TIMEOUT_MS = 15000 // 15 seconds minimum timeout
+const VALIDATION_TIMEOUT_MS = 30000 // 30 seconds for validation requests
+
+// Retry configuration
+const MAX_RETRIES = 3
+const INITIAL_RETRY_DELAY_MS = 1000
+const MAX_RETRY_DELAY_MS = 10000
 
 /**
- * Implements the IEmbedder interface using a local Ollama instance.
+ * Implements the IEmbedder interface using a local Ollama instance with robust timeout handling.
  */
 export class CodeIndexOllamaEmbedder implements IEmbedder {
 	private readonly baseUrl: string
 	private readonly defaultModelId: string
 
 	constructor(options: ApiHandlerOptions) {
+
 		// Ensure ollamaBaseUrl and ollamaModelId exist on ApiHandlerOptions or add defaults
 		let baseUrl = options.ollamaBaseUrl || "http://localhost:11434"
 
@@ -26,7 +35,155 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 		baseUrl = baseUrl.replace(/\/+$/, "")
 
 		this.baseUrl = baseUrl
+
 		this.defaultModelId = options.ollamaModelId || "nomic-embed-text:latest"
+	}
+
+	/**
+	 * Calculate adaptive timeout based on the number of texts and their content
+	 */
+	private calculateAdaptiveTimeout(texts: string[]): number {
+		// Calculate timeout based on number of texts and their average length
+		const avgLength = texts.reduce((sum, text) => sum + text.length, 0) / texts.length
+		const complexityFactor = Math.max(1, avgLength / 1000) // Longer texts need more time
+
+		const calculatedTimeout = BASE_TIMEOUT_MS + texts.length * TIMEOUT_PER_TEXT_MS * complexityFactor
+
+		// Clamp between min and max
+		return Math.max(MIN_TIMEOUT_MS, Math.min(MAX_TIMEOUT_MS, calculatedTimeout))
+	}
+
+	/**
+	 * Create a fetch request with adaptive timeout and retry logic
+	 */
+	private async fetchWithRetry(
+		url: string,
+		options: RequestInit,
+		timeoutMs: number,
+		maxRetries: number = MAX_RETRIES,
+	): Promise<Response> {
+		let lastError: Error | null = null
+
+		for (let attempt = 0; attempt < maxRetries; attempt++) {
+			try {
+				// Create abort controller for this attempt
+				const controller = new AbortController()
+				let timeoutId: NodeJS.Timeout | null = null
+
+				// Set up timeout only if timeoutMs > 0
+				if (timeoutMs > 0) {
+					timeoutId = setTimeout(() => {
+						controller.abort()
+					}, timeoutMs)
+				}
+
+				const requestOptions = {
+					...options,
+					signal: controller.signal,
+				}
+
+				try {
+					const response = await fetch(url, requestOptions)
+
+					// Clear timeout on successful response
+					if (timeoutId) {
+						clearTimeout(timeoutId)
+					}
+
+					return response
+				} catch (fetchError) {
+					// Clear timeout on error
+					if (timeoutId) {
+						clearTimeout(timeoutId)
+					}
+					throw fetchError
+				}
+			} catch (error: any) {
+				lastError = error
+
+				// Don't retry on certain errors
+				if (error.name === "AbortError" && attempt < maxRetries - 1) {
+					console.warn(`Request timeout on attempt ${attempt + 1}, retrying...`)
+				} else if (error.message?.includes("fetch failed") || error.code === "ECONNREFUSED") {
+					// Connection errors - don't retry
+					throw error
+				} else if (attempt === maxRetries - 1) {
+					// Last attempt failed
+					throw error
+				}
+
+				// Calculate retry delay with exponential backoff
+				const baseDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt)
+				const delay = Math.min(baseDelay, MAX_RETRY_DELAY_MS)
+
+				console.warn(`Request failed on attempt ${attempt + 1}, retrying in ${delay}ms...`)
+				await new Promise((resolve) => setTimeout(resolve, delay))
+			}
+		}
+
+		throw lastError || new Error("Max retries exceeded")
+	}
+
+	/**
+	 * Process embeddings in chunks to avoid overwhelming the service
+	 */
+	private async processEmbeddingsInChunks(
+		processedTexts: string[],
+		modelToUse: string,
+		chunkSize: number = 50, // Process in smaller chunks
+	): Promise<number[][]> {
+		const allEmbeddings: number[][] = []
+
+		for (let i = 0; i < processedTexts.length; i += chunkSize) {
+			const chunk = processedTexts.slice(i, i + chunkSize)
+			const chunkTimeout = this.calculateAdaptiveTimeout(chunk)
+
+			console.log(
+				`Processing chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(processedTexts.length / chunkSize)} (${chunk.length} items, timeout: ${chunkTimeout}ms)`,
+			)
+
+			const response = await this.fetchWithRetry(
+				`${this.baseUrl}/api/embed`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						model: modelToUse,
+						input: chunk,
+					}),
+				},
+				chunkTimeout,
+			)
+
+			if (!response.ok) {
+				let errorBody = t("embeddings:ollama.couldNotReadErrorBody")
+				try {
+					errorBody = await response.text()
+				} catch (e) {
+					// Ignore error reading body
+				}
+				throw new Error(
+					t("embeddings:ollama.requestFailed", {
+						status: response.status,
+						statusText: response.statusText,
+						errorBody,
+					}),
+				)
+			}
+
+			const data = await response.json()
+			const embeddings = data.embeddings
+
+			if (!embeddings || !Array.isArray(embeddings)) {
+				throw new Error(t("embeddings:ollama.invalidResponseStructure"))
+			}
+
+			allEmbeddings.push(...embeddings)
+		}
+
+		return allEmbeddings
 	}
 
 	/**
@@ -37,7 +194,6 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 	 */
 	async createEmbeddings(texts: string[], model?: string): Promise<EmbeddingResponse> {
 		const modelToUse = model || this.defaultModelId
-		const url = `${this.baseUrl}/api/embed` // Endpoint as specified
 
 		// Apply model-specific query prefix if required
 		const queryPrefix = getModelQueryPrefix("ollama", modelToUse)
@@ -57,7 +213,6 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 								maxTokens: MAX_ITEM_TOKENS,
 							}),
 						)
-						// Return original text if adding prefix would exceed limit
 						return text
 					}
 					return prefixedText
@@ -65,50 +220,58 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 			: texts
 
 		try {
-			// Note: Standard Ollama API uses 'prompt' for single text, not 'input' for array.
-			// Implementing based on user's specific request structure.
+			console.log(`Creating embeddings for ${processedTexts.length} texts`)
 
-			// Add timeout to prevent indefinite hanging
-			const controller = new AbortController()
-			const timeoutId = setTimeout(() => controller.abort(), OLLAMA_EMBEDDING_TIMEOUT_MS)
+			let embeddings: number[][]
 
-			const response = await fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					model: modelToUse,
-					input: processedTexts, // Using 'input' as requested
-				}),
-				signal: controller.signal,
-			})
-			clearTimeout(timeoutId)
+			// For large batches, process in chunks
+			if (processedTexts.length > 100) {
+				embeddings = await this.processEmbeddingsInChunks(processedTexts, modelToUse)
+			} else {
+				// For smaller batches, process all at once with adaptive timeout
+				const adaptiveTimeout = this.calculateAdaptiveTimeout(processedTexts)
+				console.log(`Using adaptive timeout: ${adaptiveTimeout}ms for ${processedTexts.length} texts`)
 
-			if (!response.ok) {
-				let errorBody = t("embeddings:ollama.couldNotReadErrorBody")
-				try {
-					errorBody = await response.text()
-				} catch (e) {
-					// Ignore error reading body
-				}
-				throw new Error(
-					t("embeddings:ollama.requestFailed", {
-						status: response.status,
-						statusText: response.statusText,
-						errorBody,
-					}),
+				const response = await this.fetchWithRetry(
+					`${this.baseUrl}/api/embed`,
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({
+							model: modelToUse,
+							input: processedTexts,
+						}),
+					},
+					adaptiveTimeout,
 				)
+
+				if (!response.ok) {
+					let errorBody = t("embeddings:ollama.couldNotReadErrorBody")
+					try {
+						errorBody = await response.text()
+					} catch (e) {
+						// Ignore error reading body
+					}
+					throw new Error(
+						t("embeddings:ollama.requestFailed", {
+							status: response.status,
+							statusText: response.statusText,
+							errorBody,
+						}),
+					)
+				}
+
+				const data = await response.json()
+				embeddings = data.embeddings
+
+				if (!embeddings || !Array.isArray(embeddings)) {
+					throw new Error(t("embeddings:ollama.invalidResponseStructure"))
+				}
 			}
 
-			const data = await response.json()
-
-			// Extract embeddings using 'embeddings' key as requested
-			const embeddings = data.embeddings
-			if (!embeddings || !Array.isArray(embeddings)) {
-				throw new Error(t("embeddings:ollama.invalidResponseStructure"))
-			}
-
+			console.log(`Successfully created ${embeddings.length} embeddings`)
 			return {
 				embeddings: embeddings,
 			}
@@ -118,6 +281,7 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 				error: sanitizeErrorMessage(error instanceof Error ? error.message : String(error)),
 				stack: error instanceof Error ? sanitizeErrorMessage(error.stack || "") : undefined,
 				location: "OllamaEmbedder:createEmbeddings",
+				batchSize: texts.length,
 			})
 
 			// Log the original error for debugging purposes
@@ -147,18 +311,17 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 				// First check if Ollama service is running by trying to list models
 				const modelsUrl = `${this.baseUrl}/api/tags`
 
-				// Add timeout to prevent indefinite hanging
-				const controller = new AbortController()
-				const timeoutId = setTimeout(() => controller.abort(), OLLAMA_VALIDATION_TIMEOUT_MS)
-
-				const modelsResponse = await fetch(modelsUrl, {
-					method: "GET",
-					headers: {
-						"Content-Type": "application/json",
+				const modelsResponse = await this.fetchWithRetry(
+					modelsUrl,
+					{
+						method: "GET",
+						headers: {
+							"Content-Type": "application/json",
+						},
 					},
-					signal: controller.signal,
-				})
-				clearTimeout(timeoutId)
+					VALIDATION_TIMEOUT_MS,
+					2, // Fewer retries for validation
+				)
 
 				if (!modelsResponse.ok) {
 					if (modelsResponse.status === 404) {
@@ -202,24 +365,21 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 				}
 
 				// Try a test embedding to ensure the model works for embeddings
-				const testUrl = `${this.baseUrl}/api/embed`
-
-				// Add timeout for test request too
-				const testController = new AbortController()
-				const testTimeoutId = setTimeout(() => testController.abort(), OLLAMA_VALIDATION_TIMEOUT_MS)
-
-				const testResponse = await fetch(testUrl, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
+				const testResponse = await this.fetchWithRetry(
+					`${this.baseUrl}/api/embed`,
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({
+							model: this.defaultModelId,
+							input: ["test"],
+						}),
 					},
-					body: JSON.stringify({
-						model: this.defaultModelId,
-						input: ["test"],
-					}),
-					signal: testController.signal,
-				})
-				clearTimeout(testTimeoutId)
+					VALIDATION_TIMEOUT_MS,
+					2, // Fewer retries for validation
+				)
 
 				if (!testResponse.ok) {
 					return {
@@ -234,13 +394,11 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 			{
 				beforeStandardHandling: (error: any) => {
 					// Handle Ollama-specific connection errors
-					// Check for fetch failed errors which indicate Ollama is not running
 					if (
 						error?.message?.includes("fetch failed") ||
 						error?.code === "ECONNREFUSED" ||
 						error?.message?.includes("ECONNREFUSED")
 					) {
-						// Capture telemetry for connection failed error
 						TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
 							error: sanitizeErrorMessage(error instanceof Error ? error.message : String(error)),
 							stack: error instanceof Error ? sanitizeErrorMessage(error.stack || "") : undefined,
@@ -251,7 +409,6 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 							error: t("embeddings:ollama.serviceNotRunning", { baseUrl: this.baseUrl }),
 						}
 					} else if (error?.code === "ENOTFOUND" || error?.message?.includes("ENOTFOUND")) {
-						// Capture telemetry for host not found error
 						TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
 							error: sanitizeErrorMessage(error instanceof Error ? error.message : String(error)),
 							stack: error instanceof Error ? sanitizeErrorMessage(error.stack || "") : undefined,
@@ -262,19 +419,16 @@ export class CodeIndexOllamaEmbedder implements IEmbedder {
 							error: t("embeddings:ollama.hostNotFound", { baseUrl: this.baseUrl }),
 						}
 					} else if (error?.name === "AbortError") {
-						// Capture telemetry for timeout error
 						TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
 							error: sanitizeErrorMessage(error instanceof Error ? error.message : String(error)),
 							stack: error instanceof Error ? sanitizeErrorMessage(error.stack || "") : undefined,
 							location: "OllamaEmbedder:validateConfiguration:timeout",
 						})
-						// Handle timeout
 						return {
 							valid: false,
 							error: t("embeddings:validation.connectionFailed"),
 						}
 					}
-					// Let standard handling take over
 					return undefined
 				},
 			},

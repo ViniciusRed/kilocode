@@ -218,7 +218,7 @@ export class OpenAiNativeHandler extends BaseProvider implements SingleCompletio
 			const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 				model: id,
 				messages: [{ role: "user", content: prompt }],
-				temperature,
+				temperature: this.isGpt5Model(id) ? null : temperature, // kilocode_change: gpt5
 				...(reasoning && reasoning),
 			}
 

@@ -1,5 +1,16 @@
 # kilo-code
 
+## [v4.79.1]
+
+- [#1871](https://github.com/Kilo-Org/kilocode/pull/1871) [`fe0b1ce`](https://github.com/Kilo-Org/kilocode/commit/fe0b1ce7141e6fb07f4c4816fd1895a663ce13e7) Thanks [@kevinvandijk](https://github.com/kevinvandijk)! - Include changes from Roo Code v3.25.10
+
+    - Improved support for GPT-5 (thanks Cline and @app/roomote!)
+    - Fix: Use CDATA sections in XML examples to prevent parser errors (#4852 by @hannesrudolph, PR by @hannesrudolph)
+    - Fix: Add missing MCP error translation keys (thanks @app/roomote!)
+    - Fix: Resolve rounding issue with max tokens (#6806 by @markp018, PR by @mrubens)
+    - Add support for GLM-4.5 and OpenAI gpt-oss models in Fireworks provider (#6753 by @alexfarlander, PR by @app/roomote)
+    - Improve UX by focusing chat input when clicking plus button in extension menu (thanks @app/roomote!)
+
 ## [v4.79.0]
 
 - [#1862](https://github.com/Kilo-Org/kilocode/pull/1862) [`43c7179`](https://github.com/Kilo-Org/kilocode/commit/43c71796a58e25805217c520a9d612d56b2f11d5) Thanks [@kevinvandijk](https://github.com/kevinvandijk)! - Include changes from Roo Code v3.25.8

@@ -71,6 +71,76 @@ export class DirectoryScanner implements IDirectoryScanner {
 	}
 
 	/**
+	 * Wait for batch slots to be available when MAX_PENDING_BATCHES limit is reached
+	 */
+	private async waitForBatchSlot(pendingBatchCount: number, activeBatchPromises: Set<Promise<void>>): Promise<void> {
+		// If we're at the limit, wait for at least one batch to complete
+		if (pendingBatchCount >= MAX_PENDING_BATCHES && activeBatchPromises.size > 0) {
+			console.log(`Waiting for batch slot (${pendingBatchCount}/${MAX_PENDING_BATCHES} active)`)
+
+			// Wait for at least one batch to complete
+			await Promise.race(activeBatchPromises)
+		}
+	}
+
+	/**
+	 * Queue a batch for processing with proper flow control
+	 */
+	private async queueBatch(
+		batchBlocks: CodeBlock[],
+		batchTexts: string[],
+		batchFileInfos: { filePath: string; fileHash: string; isNew: boolean }[],
+		scanWorkspace: string,
+		activeBatchPromises: Set<Promise<void>>,
+		pendingBatchCount: { value: number },
+		batchLimiter: any,
+		batchPerformanceHistory: number[],
+		onError?: (error: Error) => void,
+		onBlocksIndexed?: (indexedCount: number) => void,
+	): Promise<void> {
+		// Wait for available slot
+		await this.waitForBatchSlot(pendingBatchCount.value, activeBatchPromises)
+
+		pendingBatchCount.value++
+		console.log(
+			`Queuing batch with ${batchBlocks.length} blocks (${pendingBatchCount.value}/${MAX_PENDING_BATCHES} active)`,
+		)
+
+		const batchPromise = batchLimiter(async () => {
+			const startTime = Date.now()
+			try {
+				await this.processRobustBatch(
+					batchBlocks,
+					batchTexts,
+					batchFileInfos,
+					scanWorkspace,
+					onError,
+					onBlocksIndexed,
+				)
+
+				const processingTime = Date.now() - startTime
+				// Update performance history (keep last 10 measurements)
+				batchPerformanceHistory.push(processingTime)
+				if (batchPerformanceHistory.length > 10) {
+					batchPerformanceHistory.shift()
+				}
+
+				console.log(`Batch completed in ${processingTime}ms`)
+			} catch (error) {
+				console.error(`Batch failed:`, error)
+				throw error
+			}
+		})
+
+		activeBatchPromises.add(batchPromise)
+		batchPromise.finally(() => {
+			activeBatchPromises.delete(batchPromise)
+			pendingBatchCount.value--
+			console.log(`Batch finished (${pendingBatchCount.value}/${MAX_PENDING_BATCHES} active)`)
+		})
+	}
+
+	/**
 	 * Recursively scans a directory for code blocks in supported files.
 	 */
 	public async scanDirectory(
@@ -122,7 +192,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 		let currentBatchTexts: string[] = []
 		let currentBatchFileInfos: { filePath: string; fileHash: string; isNew: boolean }[] = []
 		const activeBatchPromises = new Set<Promise<void>>()
-		let pendingBatchCount = 0
+		const pendingBatchCount = { value: 0 } // Use object to allow mutation in nested functions
 
 		// Process all files in parallel with concurrency control
 		const parsePromises = supportedPaths.map((filePath) =>
@@ -184,41 +254,28 @@ export class DirectoryScanner implements IDirectoryScanner {
 
 									// Check if adaptive batch threshold is met
 									if (currentBatchBlocks.length >= adaptiveBatchSize) {
-
 										const batchBlocks = [...currentBatchBlocks]
 										const batchTexts = [...currentBatchTexts]
 										const batchFileInfos = [...currentBatchFileInfos]
+
+										// Clear current batch
 										currentBatchBlocks = []
 										currentBatchTexts = []
 										currentBatchFileInfos = []
 
-
-										// Queue batch processing with performance tracking
-										const batchPromise = batchLimiter(async () => {
-											const startTime = Date.now()
-											await this.processRobustBatch(
-
-												batchBlocks,
-												batchTexts,
-												batchFileInfos,
-												scanWorkspace,
-												onError,
-												onBlocksIndexed,
-											)
-											const processingTime = Date.now() - startTime
-
-											// Update performance history (keep last 10 measurements)
-											batchPerformanceHistory.push(processingTime)
-											if (batchPerformanceHistory.length > 10) {
-												batchPerformanceHistory.shift()
-											}
-										})
-
-										activeBatchPromises.add(batchPromise)
-										batchPromise.finally(() => {
-											activeBatchPromises.delete(batchPromise)
-											pendingBatchCount--
-										})
+										// Queue batch for processing
+										await this.queueBatch(
+											batchBlocks,
+											batchTexts,
+											batchFileInfos,
+											scanWorkspace,
+											activeBatchPromises,
+											pendingBatchCount,
+											batchLimiter,
+											batchPerformanceHistory,
+											onError,
+											onBlocksIndexed,
+										)
 									}
 								} finally {
 									release()
@@ -274,33 +331,32 @@ export class DirectoryScanner implements IDirectoryScanner {
 				const batchBlocks = [...currentBatchBlocks]
 				const batchTexts = [...currentBatchTexts]
 				const batchFileInfos = [...currentBatchFileInfos]
+
+				// Clear current batch
 				currentBatchBlocks = []
 				currentBatchTexts = []
 				currentBatchFileInfos = []
 
-
-
-				const batchPromise = batchLimiter(() =>
-					this.processRobustBatch(
-						batchBlocks,
-						batchTexts,
-						batchFileInfos,
-						scanWorkspace,
-						onError,
-						onBlocksIndexed,
-					),
+				// Queue final batch for processing
+				await this.queueBatch(
+					batchBlocks,
+					batchTexts,
+					batchFileInfos,
+					scanWorkspace,
+					activeBatchPromises,
+					pendingBatchCount,
+					batchLimiter,
+					batchPerformanceHistory,
+					onError,
+					onBlocksIndexed,
 				)
-				activeBatchPromises.add(batchPromise)
-				batchPromise.finally(() => {
-					activeBatchPromises.delete(batchPromise)
-					pendingBatchCount--
-				})
 			} finally {
 				release()
 			}
 		}
 
 		// Wait for all batch processing to complete
+		console.log(`Waiting for ${activeBatchPromises.size} remaining batches to complete`)
 		await Promise.all(activeBatchPromises)
 
 		// Handle deleted files
@@ -344,7 +400,6 @@ export class DirectoryScanner implements IDirectoryScanner {
 
 						// Log error and continue processing instead of re-throwing
 						console.error(`Failed to delete points for removed file: ${cachedFilePath}`, error)
-
 					}
 				}
 			}
@@ -360,7 +415,7 @@ export class DirectoryScanner implements IDirectoryScanner {
 	}
 
 	/**
-	 * Enhanced batch processing with exponential backoff and circuit breaker pattern
+	 * Enhanced batch processing with exponential backoff and improved circuit breaker pattern
 	 */
 	private async processRobustBatch(
 		batchBlocks: CodeBlock[],
@@ -375,99 +430,16 @@ export class DirectoryScanner implements IDirectoryScanner {
 		let attempts = 0
 		let success = false
 		let lastError: Error | null = null
-		let currentBatchSize = batchBlocks.length
 
-		console.log(`Processing batch with ${currentBatchSize} blocks`)
+		console.log(`Processing batch with ${batchBlocks.length} blocks`)
 
 		while (attempts < MAX_BATCH_RETRIES && !success) {
 			attempts++
 
 			try {
-				// --- Deletion Step ---
-				const uniqueFilePaths = [
-					...new Set(batchFileInfos.filter((info) => !info.isNew).map((info) => info.filePath)),
-				]
-
-				if (uniqueFilePaths.length > 0) {
-					console.log(`Deleting existing points for ${uniqueFilePaths.length} files`)
-					try {
-						await this.qdrantClient.deletePointsByMultipleFilePaths(uniqueFilePaths)
-					} catch (deleteError: any) {
-						const errorStatus =
-							deleteError?.status || deleteError?.response?.status || deleteError?.statusCode
-						const errorMessage = deleteError instanceof Error ? deleteError.message : String(deleteError)
-
-						console.error(
-							`[DirectoryScanner] Failed to delete points for ${uniqueFilePaths.length} files before upsert in workspace ${scanWorkspace}:`,
-							deleteError,
-						)
-
-						TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
-							error: sanitizeErrorMessage(errorMessage),
-							stack:
-								deleteError instanceof Error
-									? sanitizeErrorMessage(deleteError.stack || "")
-									: undefined,
-							location: "processRobustBatch:deletePointsByMultipleFilePaths",
-							fileCount: uniqueFilePaths.length,
-
-							errorStatus: errorStatus,
-						})
-
-						// Re-throw with workspace context
-
-							attemptNumber: attempts,
-						})
-
-						throw new Error(
-							`Failed to delete points for ${uniqueFilePaths.length} files. Workspace: ${scanWorkspace}. ${errorMessage}`,
-							{ cause: deleteError },
-						)
-					}
-				}
-
-				// --- Embedding Creation Step ---
-				console.log(`Creating embeddings for batch of ${batchTexts.length} texts (attempt ${attempts})`)
-
-				const startTime = Date.now()
-				const { embeddings } = await this.embedder.createEmbeddings(batchTexts)
-				const embeddingTime = Date.now() - startTime
-
-				console.log(`Embeddings created in ${embeddingTime}ms`)
-
-				// --- Vector Store Upsert Step ---
-				const points = batchBlocks.map((block, index) => {
-					const normalizedAbsolutePath = generateNormalizedAbsolutePath(block.file_path, scanWorkspace)
-					const pointId = uuidv5(block.segmentHash, QDRANT_CODE_BLOCK_NAMESPACE)
-
-					return {
-						id: pointId,
-						vector: embeddings[index],
-						payload: {
-							filePath: generateRelativeFilePath(normalizedAbsolutePath, scanWorkspace),
-							codeChunk: block.content,
-							startLine: block.start_line,
-							endLine: block.end_line,
-							segmentHash: block.segmentHash,
-						},
-					}
-				})
-
-				console.log(`Upserting ${points.length} points to vector store`)
-				const upsertStartTime = Date.now()
-				await this.qdrantClient.upsertPoints(points)
-				const upsertTime = Date.now() - upsertStartTime
-
-				console.log(`Points upserted in ${upsertTime}ms`)
-				onBlocksIndexed?.(batchBlocks.length)
-
-				// --- Cache Update Step ---
-				for (const fileInfo of batchFileInfos) {
-					await this.cacheManager.updateHash(fileInfo.filePath, fileInfo.fileHash)
-				}
-
+				await this.executeBatchProcess(batchBlocks, batchTexts, batchFileInfos, scanWorkspace, onBlocksIndexed)
 				success = true
-				console.log(`Batch processed successfully in ${Date.now() - startTime}ms (attempt ${attempts})`)
+				console.log(`Batch processed successfully (attempt ${attempts})`)
 			} catch (error) {
 				lastError = error as Error
 				console.error(
@@ -490,47 +462,23 @@ export class DirectoryScanner implements IDirectoryScanner {
 					(error.message.includes("timeout") ||
 						error.message.includes("too large") ||
 						error.message.includes("memory") ||
+						error.message.includes("rate limit") ||
 						batchBlocks.length > ADAPTIVE_BATCH_SIZE_MIN * 2)
 
 				if (shouldSplitBatch && attempts === 1 && batchBlocks.length > ADAPTIVE_BATCH_SIZE_MIN) {
 					console.log(
-						`Splitting large batch into smaller chunks due to error: ${error instanceof Error ? error.message : String(error)}`,
+						`Attempting batch split due to error: ${error instanceof Error ? error.message : String(error)}`,
 					)
 
-					// Split batch in half and process recursively
-					const midPoint = Math.floor(batchBlocks.length / 2)
-
-					const firstHalf = {
-						blocks: batchBlocks.slice(0, midPoint),
-						texts: batchTexts.slice(0, midPoint),
-						fileInfos: batchFileInfos.slice(0, midPoint),
-					}
-
-					const secondHalf = {
-						blocks: batchBlocks.slice(midPoint),
-						texts: batchTexts.slice(midPoint),
-						fileInfos: batchFileInfos.slice(midPoint),
-					}
-
 					try {
-						await this.processRobustBatch(
-							firstHalf.blocks,
-							firstHalf.texts,
-							firstHalf.fileInfos,
+						await this.splitAndProcessBatch(
+							batchBlocks,
+							batchTexts,
+							batchFileInfos,
 							scanWorkspace,
 							onError,
 							onBlocksIndexed,
 						)
-
-						await this.processRobustBatch(
-							secondHalf.blocks,
-							secondHalf.texts,
-							secondHalf.fileInfos,
-							scanWorkspace,
-							onError,
-							onBlocksIndexed,
-						)
-
 						success = true
 						console.log(`Batch successfully processed after splitting`)
 						break
@@ -556,33 +504,179 @@ export class DirectoryScanner implements IDirectoryScanner {
 		}
 
 		if (!success && lastError) {
-			console.error(
-				`[DirectoryScanner] Failed to process batch after ${MAX_BATCH_RETRIES} attempts and batch splitting`,
-			)
+			this.handleBatchFailure(lastError, batchBlocks.length, scanWorkspace, onError)
+		}
+	}
 
-			// Capture final failure telemetry
-			TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
-				error: sanitizeErrorMessage(lastError.message),
-				stack: sanitizeErrorMessage(lastError.stack || ""),
-				location: "processRobustBatch:finalFailure",
-				maxRetries: MAX_BATCH_RETRIES,
-				batchSize: batchBlocks.length,
-				workspace: scanWorkspace,
-			})
+	/**
+	 * Execute the core batch processing logic
+	 */
+	private async executeBatchProcess(
+		batchBlocks: CodeBlock[],
+		batchTexts: string[],
+		batchFileInfos: { filePath: string; fileHash: string; isNew: boolean }[],
+		scanWorkspace: string,
+		onBlocksIndexed?: (indexedCount: number) => void,
+	): Promise<void> {
+		// --- Deletion Step ---
+		const uniqueFilePaths = [...new Set(batchFileInfos.filter((info) => !info.isNew).map((info) => info.filePath))]
 
-			if (onError) {
-				// Preserve the original error message from embedders which now have detailed i18n messages
-				const errorMessage = lastError.message || "Unknown error"
+		if (uniqueFilePaths.length > 0) {
+			console.log(`Deleting existing points for ${uniqueFilePaths.length} files`)
+			try {
+				await this.qdrantClient.deletePointsByMultipleFilePaths(uniqueFilePaths)
+			} catch (deleteError: any) {
+				const errorStatus = deleteError?.status || deleteError?.response?.status || deleteError?.statusCode
+				const errorMessage = deleteError instanceof Error ? deleteError.message : String(deleteError)
 
-				onError(
-					new Error(
-						t("embeddings:scanner.failedToProcessBatchWithError", {
-							maxRetries: MAX_BATCH_RETRIES,
-							errorMessage,
-						}) + ` (Workspace: ${scanWorkspace}, Batch Size: ${batchBlocks.length})`,
-					),
+				console.error(
+					`[DirectoryScanner] Failed to delete points for ${uniqueFilePaths.length} files before upsert in workspace ${scanWorkspace}:`,
+					deleteError,
+				)
+
+				TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
+					error: sanitizeErrorMessage(errorMessage),
+					stack: deleteError instanceof Error ? sanitizeErrorMessage(deleteError.stack || "") : undefined,
+					location: "executeBatchProcess:deletePointsByMultipleFilePaths",
+					fileCount: uniqueFilePaths.length,
+					errorStatus: errorStatus,
+				})
+
+				throw new Error(
+					`Failed to delete points for ${uniqueFilePaths.length} files. Workspace: ${scanWorkspace}. ${errorMessage}`,
+					{ cause: deleteError },
 				)
 			}
+		}
+
+		// --- Embedding Creation Step ---
+		console.log(`Creating embeddings for batch of ${batchTexts.length} texts`)
+		const startTime = Date.now()
+		const { embeddings } = await this.embedder.createEmbeddings(batchTexts)
+		const embeddingTime = Date.now() - startTime
+		console.log(`Embeddings created in ${embeddingTime}ms`)
+
+		// --- Vector Store Upsert Step ---
+		const points = batchBlocks.map((block, index) => {
+			const normalizedAbsolutePath = generateNormalizedAbsolutePath(block.file_path, scanWorkspace)
+			const pointId = uuidv5(block.segmentHash, QDRANT_CODE_BLOCK_NAMESPACE)
+
+			return {
+				id: pointId,
+				vector: embeddings[index],
+				payload: {
+					filePath: generateRelativeFilePath(normalizedAbsolutePath, scanWorkspace),
+					codeChunk: block.content,
+					startLine: block.start_line,
+					endLine: block.end_line,
+					segmentHash: block.segmentHash,
+				},
+			}
+		})
+
+		console.log(`Upserting ${points.length} points to vector store`)
+		const upsertStartTime = Date.now()
+		await this.qdrantClient.upsertPoints(points)
+		const upsertTime = Date.now() - upsertStartTime
+		console.log(`Points upserted in ${upsertTime}ms`)
+
+		onBlocksIndexed?.(batchBlocks.length)
+
+		// --- Cache Update Step ---
+		for (const fileInfo of batchFileInfos) {
+			await this.cacheManager.updateHash(fileInfo.filePath, fileInfo.fileHash)
+		}
+	}
+
+	/**
+	 * Split batch and process smaller chunks recursively
+	 */
+	private async splitAndProcessBatch(
+		batchBlocks: CodeBlock[],
+		batchTexts: string[],
+		batchFileInfos: { filePath: string; fileHash: string; isNew: boolean }[],
+		scanWorkspace: string,
+		onError?: (error: Error) => void,
+		onBlocksIndexed?: (indexedCount: number) => void,
+	): Promise<void> {
+		const midPoint = Math.floor(batchBlocks.length / 2)
+
+		// Create properly aligned splits - ensure fileInfos match blocks
+		const firstHalf = {
+			blocks: batchBlocks.slice(0, midPoint),
+			texts: batchTexts.slice(0, midPoint),
+			// Find corresponding file infos based on file paths in blocks
+			fileInfos: batchFileInfos.filter((fileInfo) =>
+				batchBlocks.slice(0, midPoint).some((block) => block.file_path === fileInfo.filePath),
+			),
+		}
+
+		const secondHalf = {
+			blocks: batchBlocks.slice(midPoint),
+			texts: batchTexts.slice(midPoint),
+			// Find corresponding file infos based on file paths in blocks
+			fileInfos: batchFileInfos.filter((fileInfo) =>
+				batchBlocks.slice(midPoint).some((block) => block.file_path === fileInfo.filePath),
+			),
+		}
+
+		console.log(`Splitting batch: ${batchBlocks.length} → ${firstHalf.blocks.length} + ${secondHalf.blocks.length}`)
+
+		// Process both halves sequentially to avoid overwhelming the system
+		await this.processRobustBatch(
+			firstHalf.blocks,
+			firstHalf.texts,
+			firstHalf.fileInfos,
+			scanWorkspace,
+			onError,
+			onBlocksIndexed,
+		)
+
+		await this.processRobustBatch(
+			secondHalf.blocks,
+			secondHalf.texts,
+			secondHalf.fileInfos,
+			scanWorkspace,
+			onError,
+			onBlocksIndexed,
+		)
+	}
+
+	/**
+	 * Handle final batch processing failure
+	 */
+	private handleBatchFailure(
+		lastError: Error,
+		batchSize: number,
+		scanWorkspace: string,
+		onError?: (error: Error) => void,
+	): void {
+		console.error(
+			`[DirectoryScanner] Failed to process batch after ${MAX_BATCH_RETRIES} attempts and batch splitting`,
+		)
+
+		// Capture final failure telemetry
+		TelemetryService.instance.captureEvent(TelemetryEventName.CODE_INDEX_ERROR, {
+			error: sanitizeErrorMessage(lastError.message),
+			stack: sanitizeErrorMessage(lastError.stack || ""),
+			location: "processRobustBatch:finalFailure",
+			maxRetries: MAX_BATCH_RETRIES,
+			batchSize: batchSize,
+			workspace: scanWorkspace,
+		})
+
+		if (onError) {
+			// Preserve the original error message from embedders which now have detailed i18n messages
+			const errorMessage = lastError.message || "Unknown error"
+
+			onError(
+				new Error(
+					t("embeddings:scanner.failedToProcessBatchWithError", {
+						maxRetries: MAX_BATCH_RETRIES,
+						errorMessage,
+					}) + ` (Workspace: ${scanWorkspace}, Batch Size: ${batchSize})`,
+				),
+			)
 		}
 	}
 }

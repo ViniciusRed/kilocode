@@ -66,7 +66,6 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 		systemPrompt: string,
 		messages: Anthropic.Messages.MessageParam[],
 		metadata?: ApiHandlerCreateMessageMetadata,
-		tools?: OpenAI.Chat.ChatCompletionTool[],
 	): ApiStream {
 		const {
 			id: model,
@@ -84,18 +83,11 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 			stream_options: { include_usage: true },
 		}
 
-		// Adiciona suporte a tools se fornecido
-		if (tools && tools.length > 0) {
-			params.tools = tools
-			params.tool_choice = "auto" // Permite que o modelo decida; pode ajustar para "required" se necessário
-		}
-
 		const stream = await this.client.chat.completions.create(params)
 
 		for await (const chunk of stream) {
 			const delta = chunk.choices[0]?.delta
 
-			// Handling para texto normal
 			if (delta?.content) {
 				yield {
 					type: "text",
@@ -103,28 +95,6 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 				}
 			}
 
-			// Novo: Handling para tool calls
-			if (delta?.tool_calls) {
-				for (const toolCall of delta.tool_calls) {
-					// Converte tool call para formato JSON string, similar ao vscode-lm.ts
-					const toolCallData = {
-						id: toolCall.id,
-						function: {
-							name: toolCall.function?.name || "",
-							arguments: toolCall.function?.arguments || "",
-						},
-					}
-
-					const toolCallText = JSON.stringify(toolCallData)
-
-					yield {
-						type: "text",
-						text: toolCallText,
-					}
-				}
-			}
-
-			// Handling para usage
 			if (chunk.usage) {
 				yield {
 					type: "usage",
@@ -144,7 +114,7 @@ export abstract class BaseOpenAiCompatibleProvider<ModelName extends string>
 				messages: [{ role: "user", content: prompt }],
 			})
 
-			return response.choices[0]?.message?.content || ""
+			return response.choices[0]?.message.content || ""
 		} catch (error) {
 			if (error instanceof Error) {
 				throw new Error(`${this.providerName} completion error: ${error.message}`)

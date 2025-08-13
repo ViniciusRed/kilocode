@@ -33,7 +33,7 @@ export const internationalZAiModels = {
 	},
 	"glm-4.5-flash": {
 		maxTokens: 98_304,
-		contextWindow: 131_072,
+		contextWindow: 32_072,
 		supportsImages: false,
 		supportsPromptCache: false,
 		inputPrice: 0,
@@ -113,9 +113,9 @@ export const mainlandZAiModels = {
 	},
 	"glm-4.5-flash": {
 		maxTokens: 98_304,
-		contextWindow: 131_072,
+		contextWindow: 32_072,
 		supportsImages: false,
-		supportsPromptCache: false,
+		supportsPromptCache: false	,
 		inputPrice: 0,
 		outputPrice: 0,
 		cacheWritesPrice: 0,

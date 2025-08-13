@@ -32,8 +32,8 @@ export const internationalZAiModels = {
 			"GLM-4.5-Air is the lightweight version of GLM-4.5. It balances performance and cost-effectiveness, and can flexibly switch to hybrid thinking models.",
 	},
 	"glm-4.5-flash": {
-		maxTokens: 98304,
-		contextWindow: 131072,
+		maxTokens: 98_304,
+		contextWindow: 131_072,
 		supportsImages: false,
 		supportsPromptCache: false,
 		inputPrice: 0,
@@ -112,8 +112,8 @@ export const mainlandZAiModels = {
 		],
 	},
 	"glm-4.5-flash": {
-		maxTokens: 98304,
-		contextWindow: 131072,
+		maxTokens: 98_304,
+		contextWindow: 131_072,
 		supportsImages: false,
 		supportsPromptCache: false,
 		inputPrice: 0,

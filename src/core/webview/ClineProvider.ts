@@ -656,6 +656,7 @@ export class ClineProvider
 			>
 		> = {},
 	) {
+		const state = await this.getState()
 		const {
 			apiConfiguration,
 			organizationAllowList,
@@ -663,7 +664,7 @@ export class ClineProvider
 			enableCheckpoints,
 			fuzzyMatchThreshold,
 			experiments,
-		} = await this.getState()
+		} = state
 
 		if (!ProfileValidator.isProfileAllowed(apiConfiguration, organizationAllowList)) {
 			throw new OrganizationAllowListViolationError(t("common:errors.violated_organization_allowlist"))
@@ -742,13 +743,8 @@ export class ClineProvider
 			}
 		}
 
-		const {
-			apiConfiguration,
-			diffEnabled: enableDiff,
-			enableCheckpoints,
-			fuzzyMatchThreshold,
-			experiments,
-		} = await this.getState()
+		const state = await this.getState()
+		const { apiConfiguration, diffEnabled: enableDiff, enableCheckpoints, fuzzyMatchThreshold, experiments } = state
 
 		const task = new Task({
 			context: this.context, // kilocode_change
@@ -1241,7 +1237,8 @@ export class ClineProvider
 	// OpenRouter
 
 	async handleOpenRouterCallback(code: string) {
-		let { apiConfiguration, currentApiConfigName } = await this.getState()
+		const state = await this.getState()
+		let { apiConfiguration, currentApiConfigName } = state
 
 		let apiKey: string
 		try {
@@ -1289,7 +1286,8 @@ export class ClineProvider
 			throw error
 		}
 
-		const { apiConfiguration, currentApiConfigName } = await this.getState()
+		const state = await this.getState()
+		const { apiConfiguration, currentApiConfigName } = state
 
 		const newConfiguration: ProviderSettings = {
 			...apiConfiguration,
@@ -1304,7 +1302,8 @@ export class ClineProvider
 	// Requesty
 
 	async handleRequestyCallback(code: string) {
-		let { apiConfiguration, currentApiConfigName } = await this.getState()
+		const state = await this.getState()
+		let { apiConfiguration, currentApiConfigName } = state
 
 		const newConfiguration: ProviderSettings = {
 			...apiConfiguration,
@@ -1319,7 +1318,8 @@ export class ClineProvider
 	// kilocode_change:
 	async handleKiloCodeCallback(token: string) {
 		const kilocode: ProviderName = "kilocode"
-		let { apiConfiguration, currentApiConfigName } = await this.getState()
+		const state = await this.getState()
+		let { apiConfiguration, currentApiConfigName } = state
 
 		await this.upsertProviderProfile(currentApiConfigName, {
 			...apiConfiguration,
@@ -1865,7 +1865,9 @@ export class ClineProvider
 		let organizationAllowList = ORGANIZATION_ALLOW_ALL
 
 		try {
-			organizationAllowList = await CloudService.instance.getAllowList()
+			if (CloudService.hasInstance()) {
+				organizationAllowList = await CloudService.instance.getAllowList()
+			}
 		} catch (error) {
 			console.error(
 				`[getState] failed to get organization allow list: ${error instanceof Error ? error.message : String(error)}`,
@@ -1875,7 +1877,9 @@ export class ClineProvider
 		let cloudUserInfo: CloudUserInfo | null = null
 
 		try {
-			cloudUserInfo = CloudService.instance.getUserInfo()
+			if (CloudService.hasInstance()) {
+				cloudUserInfo = CloudService.instance.getUserInfo()
+			}
 		} catch (error) {
 			console.error(
 				`[getState] failed to get cloud user info: ${error instanceof Error ? error.message : String(error)}`,
@@ -1885,7 +1889,9 @@ export class ClineProvider
 		let cloudIsAuthenticated: boolean = false
 
 		try {
-			cloudIsAuthenticated = CloudService.instance.isAuthenticated()
+			if (CloudService.hasInstance()) {
+				cloudIsAuthenticated = CloudService.instance.isAuthenticated()
+			}
 		} catch (error) {
 			console.error(
 				`[getState] failed to get cloud authentication state: ${error instanceof Error ? error.message : String(error)}`,
@@ -1895,7 +1901,9 @@ export class ClineProvider
 		let sharingEnabled: boolean = false
 
 		try {
-			sharingEnabled = await CloudService.instance.canShareTask()
+			if (CloudService.hasInstance()) {
+				sharingEnabled = await CloudService.instance.canShareTask()
+			}
 		} catch (error) {
 			console.error(
 				`[getState] failed to get sharing enabled state: ${error instanceof Error ? error.message : String(error)}`,
@@ -2098,7 +2106,8 @@ export class ClineProvider
 		}
 
 		// Logout from Kilo Code provider before resetting (same approach as ProfileView logout)
-		const { apiConfiguration, currentApiConfigName } = await this.getState()
+		const state = await this.getState()
+		const { apiConfiguration, currentApiConfigName } = state
 		if (apiConfiguration.kilocodeToken) {
 			await this.upsertProviderProfile(currentApiConfigName, {
 				...apiConfiguration,
@@ -2161,12 +2170,13 @@ export class ClineProvider
 	 * like the current mode, API provider, git repository information, etc.
 	 */
 	public async getTelemetryProperties(): Promise<TelemetryProperties> {
+		const state = await this.getState()
 		const {
 			mode,
 			apiConfiguration,
 			language,
 			experiments, // kilocode_change
-		} = await this.getState()
+		} = state
 		const task = this.getCurrentCline()
 
 		const packageJSON = this.context.extension?.packageJSON

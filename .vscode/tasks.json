@@ -12,10 +12,10 @@
 			"group": {
 				"kind": "build",
 				"isDefault": true
-			},
-			"runOptions": {
-				"runOn": "folderOpen"
 			}
+			// "runOptions": {
+			// 	"runOn": "folderOpen"
+			// }
 		},
 		{
 			"label": "watch:pnpm",

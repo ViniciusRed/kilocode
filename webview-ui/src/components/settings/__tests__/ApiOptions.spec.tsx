@@ -262,6 +262,14 @@ vi.mock("@src/components/ui/hooks/useSelectedModel", () => ({
 			}
 		}
 	}),
+	// kilocode_change start
+	useModelProviders: vi.fn(() => ({
+		data: {
+			openai: { id: "openai", name: "OpenAI" },
+			anthropic: { id: "anthropic", name: "Anthropic" },
+		},
+	})),
+	// kilocode_change end
 }))
 
 const renderApiOptions = (props: Partial<ApiOptionsProps> = {}) => {

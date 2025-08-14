@@ -10,7 +10,7 @@ import { ToolUse, AskApproval, HandleError, PushToolResult, RemoveClosingTag } f
 import { fileExistsAtPath } from "../../utils/fs"
 import { getReadablePath } from "../../utils/path"
 import { Experiments, ProviderSettings } from "@roo-code/types"
-import { getKiloBaseUriFromToken } from "../../utils/kilocode-token"
+import { getKiloBaseUriFromToken } from "../../shared/kilocode/token"
 import { DEFAULT_HEADERS } from "../../api/providers/constants"
 import { TelemetryService } from "@roo-code/telemetry"
 
@@ -274,20 +274,28 @@ async function getMorphConfiguration(
 		}
 	}
 
-	if (apiConfig.apiProvider === "kilocode" && apiConfig.kilocodeToken) {
+	if (apiConfig.apiProvider === "kilocode") {
+		const token = apiConfig.kilocodeToken
+		if (!token) {
+			return { available: false, error: "No KiloCode token available to use Morph" }
+		}
 		return {
 			available: true,
-			apiKey: apiConfig.kilocodeToken,
-			baseUrl: `${getKiloBaseUriFromToken(apiConfig.kilocodeToken)}/api/openrouter/`,
+			apiKey: token,
+			baseUrl: `${getKiloBaseUriFromToken(token)}/api/openrouter/`,
 			model: "morph/morph-v3-large", // Morph model via OpenRouter
 		}
 	}
 
 	// If user is using OpenRouter as their provider, use Morph through OpenRouter
-	if (apiConfig.apiProvider === "openrouter" && apiConfig.openRouterApiKey) {
+	if (apiConfig.apiProvider === "openrouter") {
+		const token = apiConfig.openRouterApiKey
+		if (!token) {
+			return { available: false, error: "No Openrouter api token available to use Morph" }
+		}
 		return {
 			available: true,
-			apiKey: apiConfig.openRouterApiKey,
+			apiKey: token,
 			baseUrl: apiConfig.openRouterBaseUrl || "https://openrouter.ai/api/v1",
 			model: "morph/morph-v3-large", // Morph model via OpenRouter
 		}

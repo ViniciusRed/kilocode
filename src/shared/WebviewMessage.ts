@@ -341,6 +341,16 @@ export interface WebviewMessage {
 }
 
 // kilocode_change begin
+export type OrganizationRole = "owner" | "admin" | "member"
+
+export type UserOrganizationWithApiKey = {
+	id: string
+	name: string
+	balance: number
+	role: OrganizationRole
+	apiKey: string
+}
+
 export type ProfileData = {
 	kilocodeToken: string
 	user: {
@@ -349,6 +359,7 @@ export type ProfileData = {
 		email: string
 		image: string
 	}
+	organizations?: UserOrganizationWithApiKey[]
 }
 
 export interface ProfileDataResponsePayload {

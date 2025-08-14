@@ -59,6 +59,7 @@ export type OpenRouterModel = z.infer<typeof openRouterModelSchema>
 
 export const openRouterModelEndpointSchema = modelRouterBaseModelSchema.extend({
 	provider_name: z.string(),
+	tag: z.string().optional(), // kilocode_change
 })
 
 export type OpenRouterModelEndpoint = z.infer<typeof openRouterModelEndpointSchema>
@@ -155,7 +156,7 @@ export async function getOpenRouterModelEndpoints(
 		const { id, architecture, endpoints } = data
 
 		for (const endpoint of endpoints) {
-			models[endpoint.provider_name] = parseOpenRouterModel({
+			models[endpoint.tag /*kilocode_change*/ ?? endpoint.provider_name] = parseOpenRouterModel({
 				id,
 				model: endpoint,
 				modality: architecture?.modality,
@@ -194,7 +195,7 @@ export const parseOpenRouterModel = ({
 
 	const cacheReadsPrice = model.pricing?.input_cache_read ? parseApiPrice(model.pricing?.input_cache_read) : undefined
 
-	const supportsPromptCache = typeof cacheWritesPrice !== "undefined" && typeof cacheReadsPrice !== "undefined"
+	const supportsPromptCache = typeof cacheReadsPrice !== "undefined" // kilocode_change: some caching models don't list a cacheWritesPrice
 
 	const modelInfo: ModelInfo = {
 		maxTokens: maxTokens || Math.ceil(model.context_length * 0.2),

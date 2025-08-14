@@ -8,7 +8,7 @@ import {
 	openRouterDefaultModelId,
 	openRouterDefaultModelInfo,
 } from "@roo-code/types"
-import { getKiloBaseUriFromToken } from "../../utils/kilocode-token"
+import { getKiloBaseUriFromToken } from "../../shared/kilocode/token"
 import { ApiHandlerCreateMessageMetadata } from ".."
 import OpenAI from "openai"
 import { getModelEndpoints } from "./fetchers/modelEndpointCache"
@@ -32,13 +32,20 @@ export class KilocodeOpenrouterHandler extends OpenRouterHandler {
 	}
 
 	override customRequestOptions(metadata?: ApiHandlerCreateMessageMetadata): OpenAI.RequestOptions | undefined {
-		return metadata
-			? {
-					headers: {
-						"X-KiloCode-TaskId": metadata.taskId,
-					},
-				}
-			: undefined
+		const headers: Record<string, string> = {}
+
+		if (metadata?.taskId) {
+			headers["X-KiloCode-TaskId"] = metadata.taskId
+		}
+
+		// Cast to access kilocode-specific properties
+		const kilocodeOptions = this.options as ApiHandlerOptions
+
+		if (kilocodeOptions.kilocodeOrganizationId) {
+			headers["X-KiloCode-OrganizationId"] = kilocodeOptions.kilocodeOrganizationId
+		}
+
+		return Object.keys(headers).length > 0 ? { headers } : undefined
 	}
 
 	override getTotalCost(lastUsage: CompletionUsage): number {

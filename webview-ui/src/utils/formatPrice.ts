@@ -1,4 +1,4 @@
-export const formatPrice = (price: number) => {
+export const formatPrice = (price: number | bigint | Intl.StringNumericLiteral /*kilocode_change: type*/) => {
 	return new Intl.NumberFormat("en-US", {
 		style: "currency",
 		currency: "USD",

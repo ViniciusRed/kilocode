@@ -57,23 +57,28 @@ import { useRouterModels } from "./useRouterModels"
 import { useOpenRouterModelProviders } from "./useOpenRouterModelProviders"
 import { useLmStudioModels } from "./useLmStudioModels"
 
+// kilocode_change start
+export const useModelProviders = (apiConfiguration?: ProviderSettings) => {
+	const provider = apiConfiguration?.apiProvider
+	return useOpenRouterModelProviders(
+		provider === "kilocode"
+			? (apiConfiguration?.kilocodeModel ?? kilocodeDefaultModelId)
+			: provider === "openrouter"
+				? (apiConfiguration?.openRouterModelId ?? openRouterDefaultModelId)
+				: undefined,
+		provider === "openrouter" ? apiConfiguration?.openRouterBaseUrl : undefined,
+	)
+}
+// kilocode_change end
+
 export const useSelectedModel = (apiConfiguration?: ProviderSettings) => {
 	const provider = apiConfiguration?.apiProvider || "anthropic"
 	// kilocode_change start
-	let openRouterModelId = provider === "openrouter" ? apiConfiguration?.openRouterModelId : undefined
-	if (provider === "kilocode") {
-		openRouterModelId = apiConfiguration?.kilocodeModel || undefined
-	}
-
 	const routerModels = useRouterModels({
 		openRouterBaseUrl: apiConfiguration?.openRouterBaseUrl,
 		openRouterApiKey: apiConfiguration?.apiKey,
 	})
-	const openRouterModelProviders = useOpenRouterModelProviders(
-		openRouterModelId,
-		apiConfiguration?.openRouterBaseUrl,
-		apiConfiguration?.apiKey,
-	)
+	const openRouterModelProviders = useModelProviders(apiConfiguration)
 	// kilocode_change end
 	const lmStudioModelId = provider === "lmstudio" ? apiConfiguration?.lmStudioModelId : undefined
 	const lmStudioModels = useLmStudioModels(lmStudioModelId)

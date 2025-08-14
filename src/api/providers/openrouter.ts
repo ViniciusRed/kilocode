@@ -29,12 +29,23 @@ import type {
 	SingleCompletionHandler,
 } from "../index"
 
+// kilocode_change start
+type OpenRouterProviderParams = {
+	order?: string[]
+	only?: string[]
+	allow_fallbacks?: boolean
+	data_collection?: "allow" | "deny"
+	sort?: "price" | "throughput" | "latency"
+}
+// kilocode_change end
+
 // Add custom interface for OpenRouter params.
 type OpenRouterChatCompletionParams = OpenAI.Chat.ChatCompletionCreateParams & {
 	transforms?: string[]
 	include_reasoning?: boolean
 	// https://openrouter.ai/docs/use-cases/reasoning-tokens
 	reasoning?: OpenRouterReasoningParams
+	provider?: OpenRouterProviderParams // kilocode_change
 }
 
 // See `OpenAI.Chat.Completions.ChatCompletionChunk["usage"]`
@@ -81,6 +92,27 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 
 	getTotalCost(lastUsage: CompletionUsage): number {
 		return (lastUsage.cost_details?.upstream_inference_cost || 0) + (lastUsage.cost || 0)
+	}
+
+	getProviderParams(): { provider?: OpenRouterProviderParams } {
+		if (this.options.openRouterSpecificProvider && this.endpoints[this.options.openRouterSpecificProvider]) {
+			return {
+				provider: {
+					order: [this.options.openRouterSpecificProvider],
+					only: [this.options.openRouterSpecificProvider],
+					allow_fallbacks: false,
+				},
+			}
+		}
+		if (this.options.openRouterProviderDataCollection || this.options.openRouterProviderSort) {
+			return {
+				provider: {
+					data_collection: this.options.openRouterProviderDataCollection,
+					sort: this.options.openRouterProviderSort,
+				},
+			}
+		}
+		return {}
 	}
 	// kilocode_change end
 
@@ -137,15 +169,7 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 			messages: openAiMessages,
 			stream: true,
 			stream_options: { include_usage: true },
-			// Only include provider if openRouterSpecificProvider is not "[default]".
-			...(this.options.openRouterSpecificProvider &&
-				this.options.openRouterSpecificProvider !== OPENROUTER_DEFAULT_PROVIDER_NAME && {
-					provider: {
-						order: [this.options.openRouterSpecificProvider],
-						only: [this.options.openRouterSpecificProvider],
-						allow_fallbacks: false,
-					},
-				}),
+			...this.getProviderParams(), // kilocode_change: original expression was moved into function
 			...(transforms && { transforms }),
 			...(reasoning && { reasoning }),
 		}
@@ -244,15 +268,7 @@ export class OpenRouterHandler extends BaseProvider implements SingleCompletionH
 			temperature,
 			messages: [{ role: "user", content: prompt }],
 			stream: false,
-			// Only include provider if openRouterSpecificProvider is not "[default]".
-			...(this.options.openRouterSpecificProvider &&
-				this.options.openRouterSpecificProvider !== OPENROUTER_DEFAULT_PROVIDER_NAME && {
-					provider: {
-						order: [this.options.openRouterSpecificProvider],
-						only: [this.options.openRouterSpecificProvider],
-						allow_fallbacks: false,
-					},
-				}),
+			...this.getProviderParams(), // kilocode_change: original expression was moved into function
 			...(reasoning && { reasoning }),
 		}
 

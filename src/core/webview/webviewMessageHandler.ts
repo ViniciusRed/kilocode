@@ -6,6 +6,7 @@ import pWaitFor from "p-wait-for"
 import * as vscode from "vscode"
 import axios from "axios" // kilocode_change
 import * as yaml from "yaml"
+import { getKiloBaseUriFromToken } from "../../shared/kilocode/token" // kilocode_change
 
 import {
 	type Language,
@@ -575,7 +576,10 @@ export const webviewMessageHandler = async (
 				{ key: "unbound", options: { provider: "unbound", apiKey: apiConfiguration.unboundApiKey } },
 				{
 					key: "kilocode-openrouter",
-					options: { provider: "kilocode-openrouter", kilocodeToken: apiConfiguration.kilocodeToken },
+					options: {
+						provider: "kilocode-openrouter",
+						kilocodeToken: apiConfiguration.kilocodeToken,
+					},
 				},
 				{ key: "ollama", options: { provider: "ollama", baseUrl: apiConfiguration.ollamaBaseUrl } },
 			]
@@ -1626,9 +1630,23 @@ export const webviewMessageHandler = async (
 			}
 			break
 		case "upsertApiConfiguration":
+			// kilocode_change start: check for kilocodeToken change to remove organizationId
 			if (message.text && message.apiConfiguration) {
-				await provider.upsertProviderProfile(message.text, message.apiConfiguration)
+				let configToSave = message.apiConfiguration
+				try {
+					const { ...currentConfig } = await provider.providerSettingsManager.getProfile({
+						name: message.text,
+					})
+					if (currentConfig.kilocodeToken !== message.apiConfiguration.kilocodeToken) {
+						configToSave = { ...message.apiConfiguration, kilocodeOrganizationId: undefined }
+					}
+				} catch (error) {
+					// Config might not exist yet, that's fine
+				}
+
+				await provider.upsertProviderProfile(message.text, configToSave)
 			}
+			// kilocode_change end
 			break
 		case "renameApiConfiguration":
 			if (message.values && message.apiConfiguration) {
@@ -2105,7 +2123,7 @@ export const webviewMessageHandler = async (
 				}
 
 				// Changed to /api/profile
-				const response = await axios.get("https://kilocode.ai/api/profile", {
+				const response = await axios.get(`${getKiloBaseUriFromToken(kilocodeToken)}/api/profile`, {
 					headers: {
 						Authorization: `Bearer ${kilocodeToken}`,
 						"Content-Type": "application/json",
@@ -2131,7 +2149,7 @@ export const webviewMessageHandler = async (
 		case "fetchBalanceDataRequest": // New handler
 			try {
 				const { apiConfiguration } = await provider.getState()
-				const kilocodeToken = apiConfiguration?.kilocodeToken
+				const { kilocodeToken, kilocodeOrganizationId } = apiConfiguration ?? {}
 
 				if (!kilocodeToken) {
 					provider.log("KiloCode token not found in extension state for balance data.")
@@ -2142,12 +2160,18 @@ export const webviewMessageHandler = async (
 					break
 				}
 
-				const response = await axios.get("https://kilocode.ai/api/profile/balance", {
+				const headers: Record<string, string> = {
+					Authorization: `Bearer ${kilocodeToken}`,
+					"Content-Type": "application/json",
+				}
+
+				if (kilocodeOrganizationId) {
+					headers["X-KiloCode-OrganizationId"] = kilocodeOrganizationId
+				}
+
+				const response = await axios.get(`${getKiloBaseUriFromToken(kilocodeToken)}/api/profile/balance`, {
 					// Original path for balance
-					headers: {
-						Authorization: `Bearer ${kilocodeToken}`,
-						"Content-Type": "application/json",
-					},
+					headers,
 				})
 				provider.postMessageToWebview({
 					type: "balanceDataResponse", // New response type

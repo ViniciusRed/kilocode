@@ -1858,14 +1858,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				})
 				// kilocode_change end
 			} catch (error) {
-				// kilocode_change start
-				TelemetryService.instance.captureException(error, {
-					abandoned: this.abandoned,
-					abort: this.abort,
-					context: "recursivelyMakeClineRequests",
-				})
-				// kilocode_change end
-
 				// Abandoned happens when extension is no longer waiting for the
 				// Cline instance to finish aborting (error is thrown here when
 				// any function in the for loop throws due to this.abort).
@@ -2023,6 +2015,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					"error",
 					"Unexpected API Response: The language model did not provide any assistant messages. This may indicate an issue with the API or the model's output.",
 				)
+
+				// kilocode_change start
+				TelemetryService.instance.captureEvent(TelemetryEventName.NO_ASSISTANT_MESSAGES)
+				// kilocode_change end
 
 				await this.addToApiConversationHistory({
 					role: "assistant",

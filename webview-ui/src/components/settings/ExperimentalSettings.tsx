@@ -16,6 +16,7 @@ import { SectionHeader } from "./SectionHeader"
 import { Section } from "./Section"
 import { ExperimentalFeature } from "./ExperimentalFeature"
 import { MorphSettings } from "./MorphSettings" // kilocode_change
+import { FastApplySettings } from "./FastApplySettings" // kilocode_change
 
 type ExperimentalSettingsProps = HTMLAttributes<HTMLDivElement> & {
 	experiments: Experiments
@@ -61,7 +62,7 @@ export const ExperimentalSettings = ({
 							)
 						}
 						// kilocode_change start
-						if (config[0] === "MORPH_FAST_APPLY") {
+						if (config[0] === "FAST_APPLY") {
 							const enabled =
 								experiments[EXPERIMENT_IDS[config[0] as keyof typeof EXPERIMENT_IDS]] ?? false
 							return (
@@ -78,7 +79,7 @@ export const ExperimentalSettings = ({
 										}
 									/>
 									{enabled && (
-										<MorphSettings
+										<FastApplySettings
 											apiConfiguration={apiConfiguration}
 											setApiConfigurationField={setApiConfigurationField}
 										/>

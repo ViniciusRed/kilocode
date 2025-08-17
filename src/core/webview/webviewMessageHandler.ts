@@ -64,6 +64,7 @@ const ALLOWED_VSCODE_SETTINGS = new Set(["terminal.integrated.inheritEnv"])
 import { MarketplaceManager, MarketplaceItemType } from "../../services/marketplace"
 import { setPendingTodoList } from "../tools/updateTodoListTool"
 import { UsageTracker } from "../../utils/usage-tracker"
+import { getOllamaModels } from "../../api/providers/fetchers/ollama"
 
 export const webviewMessageHandler = async (
 	provider: ClineProvider,
@@ -2454,7 +2455,6 @@ export const webviewMessageHandler = async (
 					if (currentCodeIndexManager.isFeatureEnabled && currentCodeIndexManager.isFeatureConfigured) {
 						if (!currentCodeIndexManager.isInitialized) {
 							try {
-
 								provider.log(`Initializing code index manager...`)
 								await provider.codeIndexManager.initialize(provider.contextProxy)
 								provider.log(`Code index manager initialized successfully after settings save`)
@@ -2464,7 +2464,6 @@ export const webviewMessageHandler = async (
 									type: "indexingStatusUpdate",
 									values: provider.codeIndexManager.getCurrentStatus(),
 								})
-
 							} catch (error) {
 								const errorMessage = error instanceof Error ? error.message : String(error)
 								provider.log(`Code index initialization failed: ${errorMessage}`)

@@ -1,0 +1,17 @@
+{
+	"experimental": {
+		"FAST_APPLY": {
+			"title": "Fast Apply",
+			"description": "Enable fast apply for quicker file editing",
+			"methods": {
+				"morph": "Morph (uses Morph API, falls back to OpenRouter)",
+				"ollama": "Ollama (select specific model)"
+			},
+			"morphApiKey": "Morph API Key",
+			"morphApiKeyPlaceholder": "Enter your Morph API key",
+			"morphWarning": "If no API key is provided, will fall back to OpenRouter",
+			"ollamaModelLabel": "Ollama Fast Apply Model",
+			"ollamaModelPlaceholder": "Enter the Ollama model ID (e.g., llama3.1:8b)"
+		}
+	}
+}

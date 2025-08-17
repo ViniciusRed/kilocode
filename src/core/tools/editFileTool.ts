@@ -3,6 +3,7 @@
 import path from "path"
 import { promises as fs } from "fs"
 import OpenAI from "openai"
+import { Ollama } from "ollama"
 
 import { Task } from "../task/Task"
 import { formatResponse } from "../prompts/responses"
@@ -109,21 +110,51 @@ export async function editFileTool(
 		// Read the original file content
 		const originalContent = await fs.readFile(absolutePath, "utf-8")
 
-		// Check if Morph is available
-		const morphApplyResult = await applyMorphEdit(originalContent, editInstructions, editCode, cline)
-
-		if (!morphApplyResult.success) {
+		// Get the current API configuration
+		const provider = cline.providerRef.deref()
+		if (!provider) {
 			cline.consecutiveMistakeCount++
 			cline.recordToolError("edit_file")
+			pushToolResult(formatResponse.toolError("No API provider available"))
+			return
+		}
+
+		const state = await provider.getState()
+		const fastApplyMethod = (state.apiConfiguration as any).fastApplyMethod || "morph"
+
+		let newContent: string
+		let applyResult: any
+
+		if (fastApplyMethod === "morph") {
+			// Try Morph first
+			applyResult = await applyMorphEdit(originalContent, editInstructions, editCode, cline)
+			if (!applyResult.success) {
+				// Try Ollama as fallback if Morph fails
+				applyResult = await applyOllamaFastEdit(originalContent, editInstructions, editCode, cline)
+			}
+		} else {
+			// Try Ollama first
+			applyResult = await applyOllamaFastEdit(originalContent, editInstructions, editCode, cline)
+			if (!applyResult.success) {
+				// Try Morph as fallback if Ollama fails
+				applyResult = await applyMorphEdit(originalContent, editInstructions, editCode, cline)
+			}
+		}
+
+		if (!applyResult.success) {
+			cline.consecutiveMistakeCount++
+			cline.recordToolError("edit_file")
+
+			const errorMethod = fastApplyMethod === "morph" ? "Morph" : "Ollama Fast Apply"
 			pushToolResult(
 				formatResponse.toolError(
-					`Failed to apply edit using Morph: ${morphApplyResult.error}. Consider using apply_diff tool instead.`,
+					`Failed to apply edit using ${errorMethod}: ${applyResult.error}. Consider using apply_diff tool instead.`,
 				),
 			)
 			return
 		}
 
-		const newContent = morphApplyResult.result!
+		newContent = applyResult.result!
 
 		// Show the diff and ask for approval
 		cline.diffViewProvider.editType = "modify"
@@ -178,6 +209,11 @@ interface MorphApplyResult {
 	error?: string
 }
 
+interface OllamaFastApplyResult {
+	success: boolean
+	result?: string
+	error?: string
+}
 async function applyMorphEdit(
 	originalContent: string,
 	instructions: string,
@@ -242,6 +278,85 @@ async function applyMorphEdit(
 	}
 }
 
+async function applyOllamaFastEdit(
+	originalContent: string,
+	instructions: string,
+	codeEdit: string,
+	cline: Task,
+): Promise<OllamaFastApplyResult> {
+	try {
+		// Get the current API configuration
+		const provider = cline.providerRef.deref()
+		if (!provider) {
+			return { success: false, error: "No API provider available" }
+		}
+
+		const state = await provider.getState()
+		const apiConfig = state.apiConfiguration
+
+		// Check if Ollama is configured and FastApply is enabled
+		if (apiConfig.apiProvider !== "ollama") {
+			return { success: false, error: "Ollama is not configured as the API provider" }
+		}
+
+		// Create Ollama client
+		const ollamaClient = new Ollama({
+			host: apiConfig.ollamaBaseUrl || "http://localhost:11434",
+		})
+
+		// Get the selected FastApply model from configuration
+		const fastApplyModel = (apiConfig as any).ollamaFastApplyModelId || "Kortix/FastApply-1.5B-v1.0"
+
+		// Prepare the prompt following the FastApply format
+		const prompt = `You are a coding assistant that helps merge code updates, ensuring every modification is fully integrated.
+
+Merge all changes from the <update> snippet into the <code> below.
+- Preserve the code's structure, order, comments, and indentation exactly.
+- Output only the updated code, enclosed within <updated-code> and </updated-code> tags.
+- Do not include any additional text, explanations, placeholders, ellipses, or code fences.
+
+<code>${originalContent}</code>
+
+<update>${codeEdit}</update>
+
+Provide the complete updated code.`
+
+		// Apply the edit using Ollama FastApply model
+		const response = await ollamaClient.chat({
+			model: fastApplyModel, // Use the selected model from configuration
+			messages: [
+				{
+					role: "user",
+					content: prompt,
+				},
+			],
+			options: {
+				temperature: 0,
+				num_predict: 8192,
+			},
+		})
+
+		const mergedCode = response.message.content
+		if (!mergedCode) {
+			return { success: false, error: "Ollama Fast Apply returned empty response" }
+		}
+
+		// Extract the updated code from the response
+		const updatedCodeMatch = mergedCode.match(/<updated-code>([\s\S]*?)<\/updated-code>/)
+		if (!updatedCodeMatch) {
+			return { success: false, error: "Could not extract updated code from Ollama response" }
+		}
+
+		return { success: true, result: updatedCodeMatch[1].trim() }
+	} catch (error) {
+		TelemetryService.instance.captureException(error, { context: "applyOllamaFastEdit" })
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Unknown error occurred",
+		}
+	}
+}
+
 interface MorphConfiguration {
 	available: boolean
 	apiKey?: string
@@ -254,11 +369,11 @@ async function getMorphConfiguration(
 	experiments: Experiments,
 	apiConfig: ProviderSettings,
 ): Promise<MorphConfiguration> {
-	// Check if Morph is enabled in API configuration
-	if (experiments.morphFastApply !== true) {
+	// Check if Fast Apply is enabled in API configuration
+	if (experiments.fastApply !== true) {
 		return {
 			available: false,
-			error: "Morph is disabled. Enable it in API Options > Enable Editing with Morph FastApply",
+			error: "Fast Apply is disabled. Enable it in API Options > Enable Fast Apply",
 		}
 	}
 

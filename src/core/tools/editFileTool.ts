@@ -6,11 +6,12 @@ import OpenAI from "openai"
 import { Ollama } from "ollama"
 
 import { Task } from "../task/Task"
+import { getOllamaModels } from "../../api/providers/fetchers/ollama"
 import { formatResponse } from "../prompts/responses"
 import { ToolUse, AskApproval, HandleError, PushToolResult, RemoveClosingTag } from "../../shared/tools"
 import { fileExistsAtPath } from "../../utils/fs"
 import { getReadablePath } from "../../utils/path"
-import { Experiments, ProviderSettings } from "@roo-code/types"
+import { Experiments, ProviderSettings, ModelInfo } from "@roo-code/types"
 import { getKiloBaseUriFromToken } from "../../shared/kilocode/token"
 import { DEFAULT_HEADERS } from "../../api/providers/constants"
 import { TelemetryService } from "@roo-code/telemetry"
@@ -121,24 +122,17 @@ export async function editFileTool(
 
 		const state = await provider.getState()
 		const fastApplyMethod = (state.apiConfiguration as any).fastApplyMethod || "morph"
+		// For FastApply, always provide default Ollama URL if not configured
+		const ollamaBaseUrl = state.apiConfiguration.ollamaBaseUrl || "http://localhost:11434"
 
 		let newContent: string
 		let applyResult: any
 
+		// Use only the configured method - no fallbacks
 		if (fastApplyMethod === "morph") {
-			// Try Morph first
 			applyResult = await applyMorphEdit(originalContent, editInstructions, editCode, cline)
-			if (!applyResult.success) {
-				// Try Ollama as fallback if Morph fails
-				applyResult = await applyOllamaFastEdit(originalContent, editInstructions, editCode, cline)
-			}
 		} else {
-			// Try Ollama first
-			applyResult = await applyOllamaFastEdit(originalContent, editInstructions, editCode, cline)
-			if (!applyResult.success) {
-				// Try Morph as fallback if Ollama fails
-				applyResult = await applyMorphEdit(originalContent, editInstructions, editCode, cline)
-			}
+			applyResult = await applyOllamaFastEdit(originalContent, editInstructions, editCode, cline, ollamaBaseUrl)
 		}
 
 		if (!applyResult.success) {
@@ -231,6 +225,7 @@ async function applyMorphEdit(
 
 		// Check if user has Morph enabled via OpenRouter or direct API
 		const morphConfig = await getMorphConfiguration(state.experiments, state.apiConfiguration)
+
 		if (!morphConfig.available) {
 			return { success: false, error: morphConfig.error || "Morph is not available" }
 		}
@@ -283,9 +278,9 @@ async function applyOllamaFastEdit(
 	instructions: string,
 	codeEdit: string,
 	cline: Task,
+	ollamaBaseUrl?: string,
 ): Promise<OllamaFastApplyResult> {
 	try {
-		// Get the current API configuration
 		const provider = cline.providerRef.deref()
 		if (!provider) {
 			return { success: false, error: "No API provider available" }
@@ -294,36 +289,53 @@ async function applyOllamaFastEdit(
 		const state = await provider.getState()
 		const apiConfig = state.apiConfiguration
 
-		// Check if Ollama is configured and FastApply is enabled
-		if (apiConfig.apiProvider !== "ollama") {
-			return { success: false, error: "Ollama is not configured as the API provider" }
-		}
-
-		// Create Ollama client
-		const ollamaClient = new Ollama({
-			host: apiConfig.ollamaBaseUrl || "http://localhost:11434",
-		})
-
-		// Get the selected FastApply model from configuration
+		const baseUrl = ollamaBaseUrl || "http://localhost:11434"
+		const ollamaClient = new Ollama({ host: baseUrl })
 		const fastApplyModel = (apiConfig as any).ollamaFastApplyModelId || "Kortix/FastApply-1.5B-v1.0"
 
-		// Prepare the prompt following the FastApply format
-		const prompt = `You are a coding assistant that helps merge code updates, ensuring every modification is fully integrated.
+		// Check if model exists
+		let availableModels: Record<string, ModelInfo> = {}
+		try {
+			availableModels = await getOllamaModels(baseUrl)
+		} catch (error) {
+			return {
+				success: false,
+				error: `Failed to check Ollama models: ${error instanceof Error ? error.message : "Unknown error"}`,
+			}
+		}
 
-Merge all changes from the <update> snippet into the <code> below.
-- Preserve the code's structure, order, comments, and indentation exactly.
-- Output only the updated code, enclosed within <updated-code> and </updated-code> tags.
-- Do not include any additional text, explanations, placeholders, ellipses, or code fences.
+		if (!availableModels[fastApplyModel]) {
+			const availableModelNames = Object.keys(availableModels)
+			if (availableModelNames.length === 0) {
+				return {
+					success: false,
+					error: `No models found in Ollama at ${baseUrl}`,
+				}
+			}
 
-<code>${originalContent}</code>
+			return {
+				success: false,
+				error: `Model '${fastApplyModel}' not found. Available: ${availableModelNames.join(", ")}`,
+			}
+		}
 
-<update>${codeEdit}</update>
+		// Get model info for context length
+		let maxContextLength = 32768 // Default for FastApply models
+		try {
+			const modelInfo = availableModels[fastApplyModel]
+			if (modelInfo) {
+				maxContextLength = modelInfo.contextWindow || 32768
+			}
+		} catch (error) {
+			console.warn("Failed to get model info for context length, using default:", error)
+			maxContextLength = 32768
+		}
 
-Provide the complete updated code.`
+		// Use same format as Morph - direct output without tags
+		const prompt = `<instructions>${instructions}</instructions>\n<code>${originalContent}</code>\n<update>${codeEdit}</update>`
 
-		// Apply the edit using Ollama FastApply model
 		const response = await ollamaClient.chat({
-			model: fastApplyModel, // Use the selected model from configuration
+			model: fastApplyModel,
 			messages: [
 				{
 					role: "user",
@@ -333,21 +345,18 @@ Provide the complete updated code.`
 			options: {
 				temperature: 0,
 				num_predict: 8192,
+				num_ctx: maxContextLength,
 			},
 		})
 
 		const mergedCode = response.message.content
+
 		if (!mergedCode) {
-			return { success: false, error: "Ollama Fast Apply returned empty response" }
+			return { success: false, error: "Empty response from Ollama" }
 		}
 
-		// Extract the updated code from the response
-		const updatedCodeMatch = mergedCode.match(/<updated-code>([\s\S]*?)<\/updated-code>/)
-		if (!updatedCodeMatch) {
-			return { success: false, error: "Could not extract updated code from Ollama response" }
-		}
-
-		return { success: true, result: updatedCodeMatch[1].trim() }
+		// Return the response directly, like Morph does
+		return { success: true, result: mergedCode.trim() }
 	} catch (error) {
 		TelemetryService.instance.captureException(error, { context: "applyOllamaFastEdit" })
 		return {
@@ -392,6 +401,7 @@ async function getMorphConfiguration(
 		if (!token) {
 			return { available: false, error: "No KiloCode token available to use Morph" }
 		}
+
 		return {
 			available: true,
 			apiKey: token,
@@ -406,6 +416,7 @@ async function getMorphConfiguration(
 		if (!token) {
 			return { available: false, error: "No Openrouter api token available to use Morph" }
 		}
+
 		return {
 			available: true,
 			apiKey: token,

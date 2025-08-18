@@ -15,7 +15,7 @@ import { SetExperimentEnabled } from "./types"
 import { SectionHeader } from "./SectionHeader"
 import { Section } from "./Section"
 import { ExperimentalFeature } from "./ExperimentalFeature"
-import { MorphSettings } from "./MorphSettings" // kilocode_change
+//import { MorphSettings } from "./MorphSettings" // kilocode_change
 import { FastApplySettings } from "./FastApplySettings" // kilocode_change
 
 type ExperimentalSettingsProps = HTMLAttributes<HTMLDivElement> & {

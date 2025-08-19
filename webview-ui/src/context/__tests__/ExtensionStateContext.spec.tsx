@@ -273,7 +273,7 @@ describe("mergeExtensionState", () => {
 				multiFileApplyDiff: true,
 				inlineAssist: false, // kilocode_change
 				preventFocusDisruption: false,
-				morphFastApply: false, // kilocode_change
+				fastApply: false, // kilocode_change
 				assistantMessageParser: false,
 			} as Record<ExperimentId, boolean>,
 		}
@@ -290,7 +290,7 @@ describe("mergeExtensionState", () => {
 			multiFileApplyDiff: true,
 			inlineAssist: false, // kilocode_change
 			preventFocusDisruption: false,
-			morphFastApply: false, // kilocode_change
+			fastApply: false, // kilocode_change
 			assistantMessageParser: false,
 		})
 	})

@@ -103,6 +103,7 @@ export class ClineProvider
 	extends EventEmitter<TaskProviderEvents>
 	implements vscode.WebviewViewProvider, TelemetryPropertiesProvider, TaskProviderLike
 {
+	[x: string]: any
 	// Used in package.json as the view's id. This value cannot be changed due
 	// to how VSCode caches views based on their id, and updating the id would
 	// break existing instances of the extension.
@@ -2227,7 +2228,7 @@ export class ClineProvider
 			try {
 				return {
 					fastApply: {
-						morphFastApply: Boolean(experiments.morphFastApply),
+						fastApply: Boolean(experiments.fastApply),
 						morphApiKey: Boolean(apiConfiguration.morphApiKey),
 					},
 				}

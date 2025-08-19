@@ -7,6 +7,7 @@ import * as vscode from "vscode"
 import axios from "axios" // kilocode_change
 import * as yaml from "yaml"
 import { getKiloBaseUriFromToken } from "../../shared/kilocode/token" // kilocode_change
+import { ProfileData } from "../../shared/WebviewMessage" // kilocode_change
 
 import {
 	type Language,
@@ -580,11 +581,21 @@ export const webviewMessageHandler = async (
 					options: {
 						provider: "kilocode-openrouter",
 						kilocodeToken: apiConfiguration.kilocodeToken,
+						kilocodeOrganizationId: apiConfiguration.kilocodeOrganizationId,
 					},
 				},
 				{ key: "ollama", options: { provider: "ollama", baseUrl: apiConfiguration.ollamaBaseUrl } },
 			]
 			// kilocode_change end
+
+			// Add IO Intelligence if API key is provided
+			const ioIntelligenceApiKey = apiConfiguration.ioIntelligenceApiKey
+			if (ioIntelligenceApiKey) {
+				modelFetchPromises.push({
+					key: "io-intelligence",
+					options: { provider: "io-intelligence", apiKey: ioIntelligenceApiKey },
+				})
+			}
 
 			// Don't fetch Ollama and LM Studio models by default anymore
 			// They have their own specific handlers: requestOllamaModels and requestLmStudioModels
@@ -938,19 +949,12 @@ export const webviewMessageHandler = async (
 		}
 		case "mcpEnabled":
 			const mcpEnabled = message.bool ?? true
-			const currentMcpEnabled = getGlobalState("mcpEnabled") ?? true
-
-			// Always update the state to ensure consistency
 			await updateGlobalState("mcpEnabled", mcpEnabled)
 
-			// Only refresh MCP connections if the value actually changed
-			// This prevents expensive MCP server refresh operations when saving unrelated settings
-			if (currentMcpEnabled !== mcpEnabled) {
-				// Delegate MCP enable/disable logic to McpHub
-				const mcpHubInstance = provider.getMcpHub()
-				if (mcpHubInstance) {
-					await mcpHubInstance.handleMcpEnabledChange(mcpEnabled)
-				}
+			// Delegate MCP enable/disable logic to McpHub
+			const mcpHubInstance = provider.getMcpHub()
+			if (mcpHubInstance) {
+				await mcpHubInstance.handleMcpEnabledChange(mcpEnabled)
 			}
 
 			await provider.postStateToWebview()
@@ -983,6 +987,11 @@ export const webviewMessageHandler = async (
 			}
 			break
 		// kilocode_change end
+		case "remoteControlEnabled":
+			await updateGlobalState("remoteControlEnabled", message.bool ?? false)
+			await provider.handleRemoteControlToggle(message.bool ?? false)
+			await provider.postStateToWebview()
+			break
 		case "refreshAllMcpServers": {
 			const mcpHub = provider.getMcpHub()
 			if (mcpHub) {
@@ -2124,12 +2133,28 @@ export const webviewMessageHandler = async (
 				}
 
 				// Changed to /api/profile
-				const response = await axios.get(`${getKiloBaseUriFromToken(kilocodeToken)}/api/profile`, {
-					headers: {
-						Authorization: `Bearer ${kilocodeToken}`,
-						"Content-Type": "application/json",
+				const response = await axios.get<Omit<ProfileData, "kilocodeToken">>(
+					`${getKiloBaseUriFromToken(kilocodeToken)}/api/profile`,
+					{
+						headers: {
+							Authorization: `Bearer ${kilocodeToken}`,
+							"Content-Type": "application/json",
+						},
 					},
-				})
+				)
+
+				// Go back to Personal when no longer part of the current set organization
+				if (
+					apiConfiguration?.kilocodeOrganizationId &&
+					!(response.data.organizations ?? []).some(
+						({ id }) => id === apiConfiguration?.kilocodeOrganizationId,
+					)
+				) {
+					provider.upsertProviderProfile(provider.providerSettingsManager.activateProfile.name, {
+						...apiConfiguration,
+						kilocodeOrganizationId: undefined,
+					})
+				}
 
 				provider.postMessageToWebview({
 					type: "profileDataResponse", // Assuming this response type is still appropriate for /api/profile

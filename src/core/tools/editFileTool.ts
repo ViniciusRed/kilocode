@@ -324,11 +324,10 @@ async function applyOllamaFastEdit(
 		try {
 			const modelInfo = availableModels[fastApplyModel]
 			if (modelInfo) {
-				maxContextLength = modelInfo.contextWindow || 32768
+				maxContextLength = modelInfo.contextWindow || maxContextLength
 			}
 		} catch (error) {
 			console.warn("Failed to get model info for context length, using default:", error)
-			maxContextLength = 32768
 		}
 
 		// Use same format as Morph - direct output without tags

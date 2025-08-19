@@ -737,6 +737,20 @@
 			"name": "Habilitar edições de arquivos concorrentes",
 			"description": "Quando habilitado, o Kilo Code pode editar múltiplos arquivos em uma única solicitação. Quando desabilitado, o Kilo Code deve editar arquivos um de cada vez. Desabilitar isso pode ajudar ao trabalhar com modelos menos capazes ou quando você quer mais controle sobre modificações de arquivos."
 		},
+		"FAST_APPLY": {
+			"name": "Habilitar Fast Apply",
+			"description": "Quando habilitado, o Kilo Code pode editar arquivos usando Fast Apply com Morph ou Ollama.",
+			"methods": {
+				"morph": "Morph",
+				"ollama": "Ollama"
+			},
+			"morphApiKey": "Chave de API Morph",
+			"morphApiKeyPlaceholder": "Digite sua chave de API Morph (opcional)",
+			"morphWarning": "Se você não configurar uma chave de API Morph, ainda poderá usar Fast Apply com Kilo Code ou OpenRouter. Sua conta será cobrada pelo uso do modelo, isso atualmente não é mostrado na interface da extensão.",
+			"ollamaModelLabel": "Modelo Fast Apply",
+			"ollamaModelPlaceholder": "Digite o nome do modelo (ex: Kortix/FastApply-1.5B-v1.0)",
+			"ollamaWarning": "Digite o nome do modelo Ollama Fast Apply que deseja usar. O padrão é Kortix/FastApply-1.5B-v1.0."
+		},
 		"MORPH_FAST_APPLY": {
 			"name": "Habilitar Morph Fast Apply",
 			"description": "Quando habilitado, o Kilo Code pode editar arquivos usando Morph Fast Apply.",

@@ -65,6 +65,7 @@ const ALLOWED_VSCODE_SETTINGS = new Set(["terminal.integrated.inheritEnv"])
 import { MarketplaceManager, MarketplaceItemType } from "../../services/marketplace"
 import { setPendingTodoList } from "../tools/updateTodoListTool"
 import { UsageTracker } from "../../utils/usage-tracker"
+import { getOllamaModels } from "../../api/providers/fetchers/ollama"
 
 export const webviewMessageHandler = async (
 	provider: ClineProvider,
@@ -2479,19 +2480,40 @@ export const webviewMessageHandler = async (
 					if (currentCodeIndexManager.isFeatureEnabled && currentCodeIndexManager.isFeatureConfigured) {
 						if (!currentCodeIndexManager.isInitialized) {
 							try {
-								await currentCodeIndexManager.initialize(provider.contextProxy)
-								provider.log(`Code index manager initialized after settings save`)
+								provider.log(`Initializing code index manager...`)
+								await provider.codeIndexManager.initialize(provider.contextProxy)
+								provider.log(`Code index manager initialized successfully after settings save`)
+
+								// Sends success status to webview
+								await provider.postMessageToWebview({
+									type: "indexingStatusUpdate",
+									values: provider.codeIndexManager.getCurrentStatus(),
+								})
 							} catch (error) {
-								provider.log(
-									`Code index initialization failed: ${error instanceof Error ? error.message : String(error)}`,
-								)
+								const errorMessage = error instanceof Error ? error.message : String(error)
+								provider.log(`Code index initialization failed: ${errorMessage}`)
+
 								// Send error status to webview
 								await provider.postMessageToWebview({
 									type: "indexingStatusUpdate",
 									values: currentCodeIndexManager.getCurrentStatus(),
 								})
 							}
+						} else {
+							// Already initialized - only updates status on webvieww
+							provider.log(`Code index manager already initialized`)
+							await provider.postMessageToWebview({
+								type: "indexingStatusUpdate",
+								values: provider.codeIndexManager.getCurrentStatus(),
+							})
 						}
+					} else {
+						// Feature disabled or not configured - informs WebView
+						provider.log(`Code index manager feature disabled or not configured`)
+						await provider.postMessageToWebview({
+							type: "indexingStatusUpdate",
+							values: provider.codeIndexManager.getCurrentStatus(),
+						})
 					}
 				} else {
 					// No workspace open - send error status

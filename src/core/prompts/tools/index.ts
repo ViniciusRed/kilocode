@@ -115,8 +115,8 @@ export function getToolDescriptionsForMode(
 		tools.delete("codebase_search")
 	}
 
-	// kilocode_change: Morph fast apply
-	if (experiments?.morphFastApply !== true) {
+	// kilocode_change: Fast apply
+	if (experiments?.fastApply !== true) {
 		tools.delete("edit_file")
 	}
 

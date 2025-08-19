@@ -43,13 +43,17 @@ async function loadLanguage(langName: string, sourceDirectory?: string) {
 
 	try {
 		const { Language } = require("web-tree-sitter")
+		// Adicionar verificação se o arquivo existe
+		const fs = require("fs")
+		if (!fs.existsSync(wasmPath)) {
+			throw new Error(`WASM file not found: ${wasmPath}`)
+		}
 		return await Language.load(wasmPath)
 	} catch (error) {
 		console.error(`Error loading language: ${wasmPath}: ${error instanceof Error ? error.message : error}`)
 		throw error
 	}
 }
-
 let isParserInitialized = false
 
 /*

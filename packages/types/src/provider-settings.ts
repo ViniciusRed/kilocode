@@ -95,6 +95,8 @@ const baseProviderSettingsSchema = z.object({
 	modelMaxThinkingTokens: z.number().optional(),
 
 	morphApiKey: z.string().optional(), // kilocode_change: Morph fast apply
+	fastApplyMethod: z.enum(["morph", "ollama"]).optional(), // kilocode_change: Fast apply method selection
+	ollamaFastApplyModelId: z.string().optional(), // kilocode_change: Ollama fast apply model
 
 	// Model verbosity.
 	verbosity: verbosityLevelsSchema.optional(),

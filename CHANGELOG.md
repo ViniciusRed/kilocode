@@ -1,5 +1,13 @@
 # kilo-code
 
+## [v4.82.1]
+
+- [#2021](https://github.com/Kilo-Org/kilocode/pull/2021) [`02adf7c`](https://github.com/Kilo-Org/kilocode/commit/02adf7c4780170125e0f54beaeb5a3cbbd972669) Thanks [@chrarnoldus](https://github.com/chrarnoldus)! - OpenRouter inference providers whose context window is smaller than that of the top provider for a particular model are now automatically ignored by default. They can still be used by selecting them specifically in the Provider Routing settings.
+
+- [#2015](https://github.com/Kilo-Org/kilocode/pull/2015) [`e5c7641`](https://github.com/Kilo-Org/kilocode/commit/e5c76411cc3ff6f5aae53e5d1e39775d6830e03e) Thanks [@mcowger](https://github.com/mcowger)! - Add API key support to the Ollama provider, enabling usage of Ollama Turbo
+
+- [#2029](https://github.com/Kilo-Org/kilocode/pull/2029) [`64c6955`](https://github.com/Kilo-Org/kilocode/commit/64c695517dd8a5556c418d88c8338ea090ea09a9) Thanks [@kevinvandijk](https://github.com/kevinvandijk)! - Add search to provider list and sort it alphabetically
+
 ## [v4.82.0]
 
 - [#1974](https://github.com/Kilo-Org/kilocode/pull/1974) [`ec18e51`](https://github.com/Kilo-Org/kilocode/commit/ec18e51d7f38c2f5ee21a02cf2290be21223119b) Thanks [@kevinvandijk](https://github.com/kevinvandijk)! - Include changes from Roo Code 3.25.14

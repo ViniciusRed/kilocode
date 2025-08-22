@@ -1,0 +1,18 @@
+{
+	"experimental": {
+		"FAST_APPLY": {
+			"title": "Aplicação Rápida",
+			"description": "Ativar aplicação rápida para edição de arquivos mais rápida",
+			"methods": {
+				"morph": "Morph (usa API do Morph, fallback para OpenRouter)",
+				"ollama": "Ollama (selecionar modelo específico)"
+			},
+			"morphApiKey": "Chave API do Morph",
+			"morphApiKeyPlaceholder": "Digite sua chave API do Morph",
+			"morphWarning": "Se nenhuma chave API for fornecida, usará OpenRouter como fallback",
+			"ollamaModelLabel": " Modelo de Aplicação Rápida do Ollama",
+			"ollamaModelPlaceholder": "Digite o ID do modelo Ollama (ex: llama3.1:8b)",
+			"ollamaWarning": "Certifique-se de que o modelo Ollama esteja rodando localmente"
+		}
+	}
+}

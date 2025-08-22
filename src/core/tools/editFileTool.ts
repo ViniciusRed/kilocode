@@ -3,13 +3,15 @@
 import path from "path"
 import { promises as fs } from "fs"
 import OpenAI from "openai"
+import { Ollama } from "ollama"
 
 import { Task } from "../task/Task"
+import { getOllamaModels } from "../../api/providers/fetchers/ollama"
 import { formatResponse } from "../prompts/responses"
 import { ToolUse, AskApproval, HandleError, PushToolResult, RemoveClosingTag } from "../../shared/tools"
 import { fileExistsAtPath } from "../../utils/fs"
 import { getReadablePath } from "../../utils/path"
-import { Experiments, ProviderSettings } from "@roo-code/types"
+import { Experiments, ProviderSettings, ModelInfo } from "@roo-code/types"
 import { getKiloBaseUriFromToken } from "../../shared/kilocode/token"
 import { DEFAULT_HEADERS } from "../../api/providers/constants"
 import { TelemetryService } from "@roo-code/telemetry"
@@ -109,21 +111,44 @@ export async function editFileTool(
 		// Read the original file content
 		const originalContent = await fs.readFile(absolutePath, "utf-8")
 
-		// Check if Morph is available
-		const morphApplyResult = await applyMorphEdit(originalContent, editInstructions, editCode, cline)
-
-		if (!morphApplyResult.success) {
+		// Get the current API configuration
+		const provider = cline.providerRef.deref()
+		if (!provider) {
 			cline.consecutiveMistakeCount++
 			cline.recordToolError("edit_file")
+			pushToolResult(formatResponse.toolError("No API provider available"))
+			return
+		}
+
+		const state = await provider.getState()
+		const fastApplyMethod = (state.apiConfiguration as any).fastApplyMethod || "morph"
+		// For FastApply, always provide default Ollama URL if not configured
+		const ollamaBaseUrl = state.apiConfiguration.ollamaBaseUrl || "http://localhost:11434"
+
+		let newContent: string
+		let applyResult: any
+
+		// Use only the configured method - no fallbacks
+		if (fastApplyMethod === "morph") {
+			applyResult = await applyMorphEdit(originalContent, editInstructions, editCode, cline)
+		} else {
+			applyResult = await applyOllamaFastEdit(originalContent, editInstructions, editCode, cline, ollamaBaseUrl)
+		}
+
+		if (!applyResult.success) {
+			cline.consecutiveMistakeCount++
+			cline.recordToolError("edit_file")
+
+			const errorMethod = fastApplyMethod === "morph" ? "Morph" : "Ollama Fast Apply"
 			pushToolResult(
 				formatResponse.toolError(
-					`Failed to apply edit using Morph: ${morphApplyResult.error}. Consider using apply_diff tool instead.`,
+					`Failed to apply edit using ${errorMethod}: ${applyResult.error}. Consider using apply_diff tool instead.`,
 				),
 			)
 			return
 		}
 
-		const newContent = morphApplyResult.result!
+		newContent = applyResult.result!
 
 		// Show the diff and ask for approval
 		cline.diffViewProvider.editType = "modify"
@@ -178,6 +203,11 @@ interface MorphApplyResult {
 	error?: string
 }
 
+interface OllamaFastApplyResult {
+	success: boolean
+	result?: string
+	error?: string
+}
 async function applyMorphEdit(
 	originalContent: string,
 	instructions: string,
@@ -195,6 +225,7 @@ async function applyMorphEdit(
 
 		// Check if user has Morph enabled via OpenRouter or direct API
 		const morphConfig = await getMorphConfiguration(state.experiments, state.apiConfiguration)
+
 		if (!morphConfig.available) {
 			return { success: false, error: morphConfig.error || "Morph is not available" }
 		}
@@ -242,6 +273,98 @@ async function applyMorphEdit(
 	}
 }
 
+async function applyOllamaFastEdit(
+	originalContent: string,
+	instructions: string,
+	codeEdit: string,
+	cline: Task,
+	ollamaBaseUrl?: string,
+): Promise<OllamaFastApplyResult> {
+	try {
+		const provider = cline.providerRef.deref()
+		if (!provider) {
+			return { success: false, error: "No API provider available" }
+		}
+
+		const state = await provider.getState()
+		const apiConfig = state.apiConfiguration
+
+		const baseUrl = ollamaBaseUrl || "http://localhost:11434"
+		const ollamaClient = new Ollama({ host: baseUrl })
+		const fastApplyModel = (apiConfig as any).ollamaFastApplyModelId || "Kortix/FastApply-1.5B-v1.0"
+
+		// Check if model exists
+		let availableModels: Record<string, ModelInfo> = {}
+		try {
+			availableModels = await getOllamaModels(baseUrl)
+		} catch (error) {
+			return {
+				success: false,
+				error: `Failed to check Ollama models: ${error instanceof Error ? error.message : "Unknown error"}`,
+			}
+		}
+
+		if (!availableModels[fastApplyModel]) {
+			const availableModelNames = Object.keys(availableModels)
+			if (availableModelNames.length === 0) {
+				return {
+					success: false,
+					error: `No models found in Ollama at ${baseUrl}`,
+				}
+			}
+
+			return {
+				success: false,
+				error: `Model '${fastApplyModel}' not found. Available: ${availableModelNames.join(", ")}`,
+			}
+		}
+
+		// Get model info for context length
+		let maxContextLength = 32768 // Default for FastApply models
+		try {
+			const modelInfo = availableModels[fastApplyModel]
+			if (modelInfo) {
+				maxContextLength = modelInfo.contextWindow || maxContextLength
+			}
+		} catch (error) {
+			console.warn("Failed to get model info for context length, using default:", error)
+		}
+
+		// Use same format as Morph - direct output without tags
+		const prompt = `<instructions>${instructions}</instructions>\n<code>${originalContent}</code>\n<update>${codeEdit}</update>`
+
+		const response = await ollamaClient.chat({
+			model: fastApplyModel,
+			messages: [
+				{
+					role: "user",
+					content: prompt,
+				},
+			],
+			options: {
+				temperature: 0,
+				num_predict: 8192,
+				num_ctx: maxContextLength,
+			},
+		})
+
+		const mergedCode = response.message.content
+
+		if (!mergedCode) {
+			return { success: false, error: "Empty response from Ollama" }
+		}
+
+		// Return the response directly, like Morph does
+		return { success: true, result: mergedCode.trim() }
+	} catch (error) {
+		TelemetryService.instance.captureException(error, { context: "applyOllamaFastEdit" })
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Unknown error occurred",
+		}
+	}
+}
+
 interface MorphConfiguration {
 	available: boolean
 	apiKey?: string
@@ -254,11 +377,11 @@ async function getMorphConfiguration(
 	experiments: Experiments,
 	apiConfig: ProviderSettings,
 ): Promise<MorphConfiguration> {
-	// Check if Morph is enabled in API configuration
-	if (experiments.morphFastApply !== true) {
+	// Check if Fast Apply is enabled in API configuration
+	if (experiments.fastApply !== true) {
 		return {
 			available: false,
-			error: "Morph is disabled. Enable it in API Options > Enable Editing with Morph FastApply",
+			error: "Fast Apply is disabled. Enable it in API Options > Enable Fast Apply",
 		}
 	}
 
@@ -277,6 +400,7 @@ async function getMorphConfiguration(
 		if (!token) {
 			return { available: false, error: "No KiloCode token available to use Morph" }
 		}
+
 		return {
 			available: true,
 			apiKey: token,
@@ -291,6 +415,7 @@ async function getMorphConfiguration(
 		if (!token) {
 			return { available: false, error: "No Openrouter api token available to use Morph" }
 		}
+
 		return {
 			available: true,
 			apiKey: token,

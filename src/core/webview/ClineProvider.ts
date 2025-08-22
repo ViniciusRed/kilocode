@@ -867,7 +867,7 @@ export class ClineProvider
 		}
 
 		const state = await this.getState()
-    const {
+		const {
 			apiConfiguration,
 			diffEnabled: enableDiff,
 			enableCheckpoints,
@@ -2361,23 +2361,7 @@ export class ClineProvider
 		}
 	}
 
-
 	private _appProperties?: StaticAppProperties
-
-	/**
-	 * Returns properties to be included in every telemetry event
-	 * This method is called by the telemetry service to get context information
-	 * like the current mode, API provider, git repository information, etc.
-	 */
-	public async getTelemetryProperties(): Promise<TelemetryProperties> {
-		const state = await this.getState()
-		const {
-			mode,
-			apiConfiguration,
-			language,
-			experiments, // kilocode_change
-		} = state
-		const task = this.getCurrentCline()
 
 	private getAppProperties(): StaticAppProperties {
 		if (!this._appProperties) {

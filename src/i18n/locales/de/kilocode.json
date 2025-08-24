@@ -11,7 +11,10 @@
 		"title": "Warnung: Niedriges Guthaben!",
 		"message": "Prüfen Sie, ob Sie kostenloses Guthaben aufladen oder mehr kaufen können!"
 	},
-	"notLoggedInError": "Anfrage kann nicht abgeschlossen werden. Stelle sicher, dass du mit dem ausgewählten Anbieter verbunden und angemeldet bist.\n\n{{error}}",
+	"task": {
+		"noAssistantMessages": "Die Antwort des Modells endete unerwartet (keine Assistant-Nachrichten). Dies könnte ein Hinweis auf Rate-Limiting sein.",
+		"notLoggedInError": "Anfrage kann nicht abgeschlossen werden. Stelle sicher, dass du mit dem ausgewählten Anbieter verbunden und angemeldet bist.\n\n{{error}}"
+	},
 	"rules": {
 		"actions": {
 			"delete": "Löschen",
